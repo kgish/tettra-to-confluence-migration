@@ -50,4 +50,6 @@ build-iPhoneSimulator/
 .rvmrc
 
 .idea
+.env
 data
+logs
