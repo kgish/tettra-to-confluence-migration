@@ -31,7 +31,5 @@ puts "-------------------"
 puts
 files = Dir.children(@data_dir)
 puts "--- FILES (#{files.length}) ---"
-files.each do |file|
-  puts file
-end
+files.each { |file| puts file }
 puts "--- FILES ---"
