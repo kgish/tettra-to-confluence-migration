@@ -22,5 +22,16 @@ end
 
 # Display environment
 puts
+puts "--- ENVIRONMENT ---"
 puts "DEBUG=#{@debug}"
 puts "DATA_DIR=#{@data_dir}"
+puts "-------------------"
+
+# List all files present in data directory
+puts
+files = Dir.children(@data_dir)
+puts "--- FILES (#{files.length}) ---"
+files.each do |file|
+  puts file
+end
+puts "--- FILES ---"
