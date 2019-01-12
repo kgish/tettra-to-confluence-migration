@@ -1,3 +1,3 @@
-# Tettra to Confluence
+# Tettra to Confluence Migration
 
-An advanced Tettra to Confluence migration tool.
+An advanced tool for migrating from Tettra to Confluence.
