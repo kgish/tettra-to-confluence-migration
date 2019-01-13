@@ -19,18 +19,25 @@ end
 # Load environment
 @debug = ENV['DEBUG'] == 'true'
 @data_dir = ENV['DATA_DIR'] || 'data'
+@converter = ENV['CONVERTER'] || 'markdown2confluence'
 
 # Display environment
 puts "\n--- ENVIRONMENT ---"
-puts "DEBUG:    '#{@debug}'"
-puts "DATA_DIR: '#{@data_dir}'"
+puts "DEBUG:     '#{@debug}'"
+puts "DATA_DIR:  '#{@data_dir}'"
+puts "CONVERTER: '#{@converter}'"
 puts "-------------------"
 
 # List all files present in data directory
 files = Dir.children(@data_dir)
 puts "\nFILES: #{files.length}"
 files.each do |file|
-  text = File.read("#{@data_dir}/#{file}")
+  next unless /\.md$/.match(file)
+  infile = "#{@data_dir}/#{file}"
+  text = File.read(infile)
   puts "#{file} => #{text.length}"
+  outfile = "#{@data_dir}/#{file.sub(/\.md$/, '')}.confluence"
+  output = `#{@converter} #{infile} >#{outfile} 2>&1`
+  puts outfile
 end
 puts "\nDone!"

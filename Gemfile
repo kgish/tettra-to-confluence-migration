@@ -14,3 +14,5 @@ gem 'rest-client'
 gem 'i18n'
 
 gem 'rubocop', require: false
+
+gem 'markdown2confluence'

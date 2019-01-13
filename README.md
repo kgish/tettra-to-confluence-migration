@@ -26,6 +26,32 @@ $ gem install bundler
 $ bundle install
 ```
 
+## markdown2confluence
+
+Install this gen as follows:
+
+```
+$ gem install markdown2confluence
+```
+
+## Configuration
+
+```
+$ cat .env
+DEBUG=true
+DATA_DIR=data
+CONVERTER=/path/to/markdown2confluence
+```
+
+To get the converter path simply execute:
+
+```
+$ which markdown2confluence
+/home/kiffin/.rvm/gems/ruby-2.6.0/bin/markdown2confluence
+```
+
+Now it can be called within this application.
+
 ## Markdown to Confluence
 
 ```
