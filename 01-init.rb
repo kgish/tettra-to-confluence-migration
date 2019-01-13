@@ -21,15 +21,16 @@ end
 @data_dir = ENV['DATA_DIR'] || 'data'
 
 # Display environment
-puts
-puts "--- ENVIRONMENT ---"
-puts "DEBUG=#{@debug}"
-puts "DATA_DIR=#{@data_dir}"
+puts "\n--- ENVIRONMENT ---"
+puts "DEBUG:    '#{@debug}'"
+puts "DATA_DIR: '#{@data_dir}'"
 puts "-------------------"
 
 # List all files present in data directory
-puts
 files = Dir.children(@data_dir)
-puts "--- FILES (#{files.length}) ---"
-files.each { |file| puts file }
-puts "--- FILES ---"
+puts "\nFILES: #{files.length}"
+files.each do |file|
+  text = File.read("#{@data_dir}/#{file}")
+  puts "#{file} => #{text.length}"
+end
+puts "\nDone!"
