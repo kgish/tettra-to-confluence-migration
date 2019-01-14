@@ -7,7 +7,6 @@ GEM
     dotenv (2.2.1)
     http-cookie (1.0.3)
       domain_name (~> 0.5)
-    i18n (0.8.6)
     kramdown (1.17.0)
     markdown2confluence (0.0.4)
       kramdown
@@ -46,7 +45,6 @@ PLATFORMS
 
 DEPENDENCIES
   dotenv
-  i18n
   markdown2confluence
   rest-client
   rubocop

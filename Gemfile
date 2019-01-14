@@ -11,7 +11,7 @@ end
 
 gem 'dotenv'
 gem 'rest-client'
-gem 'i18n'
+# gem 'i18n'
 
 gem 'rubocop', require: false
 
