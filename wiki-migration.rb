@@ -54,8 +54,37 @@ def get_spaces
   results
 end
 
+# id, key, name, type, status
 def get_space(name)
   return get_spaces.find {|space| space['name'] == name}
+end
+
+# POST wiki/rest/api/content
+# {
+#     "type": "page",
+#     "title": <TITLE>,
+#     "space": { "key": <KEY> },
+#     "body": {
+#         "storage": {
+#             "value": <CONTENT>,
+#             "representation": "storage"
+#         }
+#     }
+# }
+#
+def create_page(key, title, content)
+
+payload = {
+    "type": "page",
+    "title": title,
+    "space": {"key": key},
+    "body": {
+        "storage": {
+            "value": content,
+            "representation": "storage"
+        }
+    }
+}
 end
 
 space = get_space(SPACE)
