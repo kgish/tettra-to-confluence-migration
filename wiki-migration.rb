@@ -41,17 +41,32 @@ HEADERS = {
 }.freeze
 
 def get_spaces
-  url = "#{API}/spaces"
+  url = "#{API}/space"
+  results = nil
   begin
     response = RestClient::Request.execute(method: :get, url: url, headers: HEADERS)
-    puts response.inspect
+    body = JSON.parse(response.body)
+    results = body['results']
     puts "GET #{url} => OK"
   rescue => e
     puts "GET #{url} => NOK (#{e.message})"
   end
+  results
 end
 
-get_spaces
+def get_space(name)
+  return get_spaces.find {|space| space['name'] == name}
+end
+
+space = get_space(SPACE)
+
+if space
+  puts "Found space='#{SPACE}' => ok"
+else
+  puts "Cannot find space='#{SPACE}' => exit"
+  exit
+end
+
 exit
 
 # List all files present in data directory
