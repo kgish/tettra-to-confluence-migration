@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
-# require 'csv'
+require 'csv'
 # require 'fileutils'
 require 'dotenv/load'
 require 'rest-client'
@@ -65,6 +65,28 @@ def confluence_get_space(name)
   return confluence_get_spaces.find {|space| space['name'] == name}
 end
 
+def write_csv_file(filename, results)
+  puts filename
+  CSV.open(filename, 'wb') do |csv|
+    # Scan whole file to collect all possible field names so that
+    # the list of columns is complete.
+    fields = []
+    results.each do |result|
+      result.keys.each do |field|
+        fields << field unless fields.include?(field)
+      end
+    end
+    csv << fields
+    results.each do |result|
+      row = []
+      fields.each do |field|
+        row.push(result[field])
+      end
+      csv << row
+    end
+  end
+end
+
 # POST wiki/rest/api/content
 # {
 #     "type": "page",
@@ -105,23 +127,31 @@ end
 # files = Dir["#{DATA}/*.md"]
 # puts "\nFILES: #{files.length}"
 # files.each do |file|
-#   infile = "#{DATA}/#{file}"
-#   outfile = "#{DATA}/#{file.sub(/\.md$/, '')}.#{EXT}"
-#   output = `#{CONVERTER} #{infile} >#{outfile}`
+#   outfile = "#{file.sub(/\.md$/, '')}.#{EXT}"
+#   output = `#{CONVERTER} #{file} >#{outfile}`
 #   puts output unless output.length === 0
 #   puts outfile
 # end
 
-files = Dir["#{DATA}/*.md"]
-files.each do |file|
-  contents = File.read(file)
-  contents.scan /\[(.+?)\]\((.+?)\)/ do |match|
-    text = match[0]
-    url = match[1]
-    puts "#{file}: #{url}"
-  end
+# files = Dir["#{DATA}/*.md"]
+# files.each do |file|
+#   content = File.read(file)
+#   content.scan /\[(.+?)\]\((.+?)\)/ do |match|
+#     text = match[0]
+#     url = match[1]
+#     puts "#{file}: #{url}"
+#   end
+# end
 
+results = []
+files = Dir["#{DATA}/*.#{EXT}"]
+files.each do |file|
+  content = File.read(file)
+  title = File.basename(file, ".#{EXT}").gsub('-', ' ').capitalize
+  puts "#{title}"
+  results << confluence_create_page(space['key'], title, content)
 end
 
+write_csv_file('results.csv', results)
 puts "\nDone!"
 
