@@ -173,26 +173,35 @@ files.each do |file|
 
   # <img src="https://tettra-production.s3.us-west-2.amazonaws.com/teams/37251/users/88716/y5TaEh2lPo7ui3vIR0r3znFYQ2JqgYXqvLd9ZDIO.png" alt="..." />
   content.scan(/<img src="(.*?)"/).each do |match|
-    counter = counter + 1
-    links << {
-        counter: counter,
-        filename: filename,
-        title: title,
-        tag: 'image',
-        value: match[0]
-    }
+    value = match[0]
+    if value =~ /^https?:\/\/tettra-production\.s3/
+      counter = counter + 1
+      links << {
+          counter: counter,
+          filename: filename,
+          title: title,
+          tag: 'image',
+          value: value,
+          page: ''
+      }
+    end
   end
 
   # <a href="https://app.tettra.co/teams/measurabl/pages/baseline-account-set-up-for-manual">
   content.scan(/<a href="(.*?)"/).each do |match|
-    counter = counter + 1
-    links << {
-        counter: counter,
-        filename: filename,
-        title: title,
-        tag: 'anchor',
-        value: match[0]
-    }
+    value = match[0]
+    if value =~ /^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\//
+      page = value.match(/^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\/(.*)$/)[1]
+      counter = counter + 1
+      links << {
+          counter: counter,
+          filename: filename,
+          title: title,
+          tag: 'anchor',
+          value: value,
+          page: page
+      }
+    end
   end
 end
 
