@@ -87,6 +87,25 @@ def write_csv_file(filename, results)
   end
 end
 
+def confluence_get_content(id)
+  url = "#{API}/content/#{id}?expand=body.storage"
+  begin
+    response = RestClient::Request.execute(method: :get, url: url, headers: HEADERS)
+    result = JSON.parse(response.body)
+    puts "GET #{url} => OK"
+  rescue => error
+    if error.response
+      response = JSON.parse(error.response)
+      statusCode = response['statusCode']
+      message = response['message']
+      puts "GET #{url} title='#{title}' => NOK statusCode='#{statusCode}', message='#{message}'"
+    else
+      puts "GET #{url} => NOK error='#{error}'"
+    end
+  end
+  result
+end
+
 # POST wiki/rest/api/content
 # {
 #     "type": "page",
@@ -101,6 +120,7 @@ end
 # }
 #
 def confluence_create_page(key, title, content)
+  result = nil
   payload = {
       "type": "page",
       "title": title,
@@ -111,47 +131,112 @@ def confluence_create_page(key, title, content)
               "representation": "storage"
           }
       }
-  }
+  }.to_json
+  url = "#{API}/content"
+  begin
+    response = RestClient::Request.execute(method: :post, url: url, payload: payload, headers: HEADERS)
+    result = JSON.parse(response.body)
+    puts "POST #{url} title='#{title}' => OK"
+  rescue => error
+    if error.response
+      response = JSON.parse(error.response)
+      statusCode = response['statusCode']
+      message = response['message']
+      puts "POST #{url} title='#{title}' => NOK statusCode='#{statusCode}', message='#{message}'"
+    else
+      puts "POST #{url} => NOK error='#{error}'"
+    end
+  end
+  result
 end
 
 space = confluence_get_space(SPACE)
 
 if space
-  puts "Found space='#{SPACE}' => ok"
+  puts "Found space='#{SPACE}' => OK"
 else
   puts "Cannot find space='#{SPACE}' => exit"
   exit
 end
 
-# Convert all markdown (.md) files in data directory to confluence.
-# files = Dir["#{DATA}/*.md"]
-# puts "\nFILES: #{files.length}"
-# files.each do |file|
-#   outfile = "#{file.sub(/\.md$/, '')}.#{EXT}"
-#   output = `#{CONVERTER} #{file} >#{outfile}`
-#   puts output unless output.length === 0
-#   puts outfile
-# end
 
-# files = Dir["#{DATA}/*.md"]
-# files.each do |file|
-#   content = File.read(file)
-#   content.scan /\[(.+?)\]\((.+?)\)/ do |match|
-#     text = match[0]
-#     url = match[1]
-#     puts "#{file}: #{url}"
-#   end
-# end
+#
+#
+links = []
+files = Dir["#{DATA}/*.html"]
+files.each do |file|
+  counter = 0
+  content = File.read(file)
+  m = /^<html><head><title>(.*?)<\/title><\/head><body>(.*)<\/body><\/html>$/.match(content)
+  title = m[1]
+  filename = file.sub(/^#{DATA}\//, '')
+
+  # <img src="https://tettra-production.s3.us-west-2.amazonaws.com/teams/37251/users/88716/y5TaEh2lPo7ui3vIR0r3znFYQ2JqgYXqvLd9ZDIO.png" alt="..." />
+  content.scan(/<img src="(.*?)"/).each do |match|
+    counter = counter + 1
+    links << {
+        counter: counter,
+        filename: filename,
+        title: title,
+        tag: 'image',
+        value: match[0]
+    }
+  end
+
+  # <a href="https://app.tettra.co/teams/measurabl/pages/baseline-account-set-up-for-manual">
+  content.scan(/<a href="(.*?)"/).each do |match|
+    counter = counter + 1
+    links << {
+        counter: counter,
+        filename: filename,
+        title: title,
+        tag: 'anchor',
+        value: match[0]
+    }
+  end
+end
+
+write_csv_file('links.csv', links)
+exit
 
 results = []
-files = Dir["#{DATA}/*.#{EXT}"]
+files = Dir["#{DATA}/*.html"]
 files.each do |file|
   content = File.read(file)
-  title = File.basename(file, ".#{EXT}").gsub('-', ' ').capitalize
-  puts "#{title}"
-  results << confluence_create_page(space['key'], title, content)
+  m = /^<html><head><title>(.*?)<\/title><\/head><body>(.*)<\/body><\/html>$/.match(content)
+  title = m[1]
+  body = m[2]
+  filename = file.sub(/^#{DATA}\//, '')
+  if title && body
+    puts "#{file} title='#{title}' => OK"
+    result = confluence_create_page(space['key'], title, body)
+    if (result)
+      results << {
+          result: 'OK',
+          filename: filename,
+          title: title,
+          id: result['id']
+      }
+    else
+      results << {
+          result: 'NOK',
+          filename: filename,
+          title: title,
+          id: 0
+      }
+    end
+  else
+    puts "#{file} title='#{title}' => NOK"
+    results << {
+        result: 'BAD',
+        filename: filename,
+        title: title,
+        id: 0
+    }
+  end
 end
 
 write_csv_file('results.csv', results)
+
 puts "\nDone!"
 
