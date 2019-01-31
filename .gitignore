@@ -55,3 +55,4 @@ data
 logs
 
 cypress.json
+node_modules
