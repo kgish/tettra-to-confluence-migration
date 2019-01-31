@@ -20,6 +20,7 @@ end
 # Load environment
 DEBUG = ENV['DEBUG'] == 'true'
 DATA = ENV['DATA'] || 'data'
+IMAGES = ENV['IMAGES'] || 'images'
 CONVERTER = ENV['CONVERTER'] || 'markdown2confluence'
 EXT = ENV['EXT'] || 'confluence'
 API = ENV['API'] || throw('API must be defined')
@@ -32,6 +33,7 @@ PASSWORD = ENV['PASSWORD'] || throw('PASSWORD must be defined')
 puts
 puts "DEBUG:    : '#{DEBUG}'"
 puts "DATA      : '#{DATA}'"
+puts "IMAGES    : '#{IMAGES}'"
 puts "CONVERTER : '#{CONVERTER}'"
 puts "EXT       : '#{EXT}'"
 puts "API       : '#{API}'"
@@ -159,53 +161,90 @@ else
   exit
 end
 
-
+# links = []
+# files = Dir["#{DATA}/*.html"]
+# files.each do |file|
+#   counter = 0
+#   content = File.read(file)
+#   m = /^<html><head><title>(.*?)<\/title><\/head><body>(.*)<\/body><\/html>$/.match(content)
+#   title = m[1]
+#   filename = file.sub(/^#{DATA}\//, '')
 #
+#   # <img src="https://tettra-production.s3.us-west-2.amazonaws.com/teams/37251/users/88716/y5TaEh2lPo7ui3vIR0r3znFYQ2JqgYXqvLd9ZDIO.png" alt="..." />
+#   content.scan(/<img src="(.*?)"/).each do |match|
+#     value = match[0]
+#     if value =~ /^https?:\/\/tettra-production\.s3/
+#       counter = counter + 1
+#       links << {
+#           counter: counter,
+#           filename: filename,
+#           title: title,
+#           tag: 'image',
+#           value: value,
+#           page: ''
+#       }
+#     end
+#   end
 #
-links = []
-files = Dir["#{DATA}/*.html"]
-files.each do |file|
-  counter = 0
-  content = File.read(file)
-  m = /^<html><head><title>(.*?)<\/title><\/head><body>(.*)<\/body><\/html>$/.match(content)
-  title = m[1]
-  filename = file.sub(/^#{DATA}\//, '')
+#   # <a href="https://app.tettra.co/teams/measurabl/pages/baseline-account-set-up-for-manual">
+#   content.scan(/<a href="(.*?)"/).each do |match|
+#     value = match[0]
+#     if value =~ /^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\//
+#       page = value.match(/^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\/(.*)$/)[1]
+#       counter = counter + 1
+#       links << {
+#           counter: counter,
+#           filename: filename,
+#           title: title,
+#           tag: 'anchor',
+#           value: value,
+#           page: page
+#       }
+#     end
+#   end
+# end
+#
+# write_csv_file('links.csv', links)
 
-  # <img src="https://tettra-production.s3.us-west-2.amazonaws.com/teams/37251/users/88716/y5TaEh2lPo7ui3vIR0r3znFYQ2JqgYXqvLd9ZDIO.png" alt="..." />
-  content.scan(/<img src="(.*?)"/).each do |match|
-    value = match[0]
-    if value =~ /^https?:\/\/tettra-production\.s3/
-      counter = counter + 1
-      links << {
-          counter: counter,
-          filename: filename,
-          title: title,
-          tag: 'image',
-          value: value,
-          page: ''
-      }
-    end
-  end
+# Download all of the images
 
-  # <a href="https://app.tettra.co/teams/measurabl/pages/baseline-account-set-up-for-manual">
-  content.scan(/<a href="(.*?)"/).each do |match|
-    value = match[0]
-    if value =~ /^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\//
-      page = value.match(/^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\/(.*)$/)[1]
-      counter = counter + 1
-      links << {
-          counter: counter,
-          filename: filename,
-          title: title,
-          tag: 'anchor',
-          value: value,
-          page: page
-      }
-    end
-  end
+links.each do |link|
+  next unless link['tag'] == 'images'
+  url = link['value']
+  image = url.
+  filepath = "#{IMAGES}/#{image}"
 end
 
-write_csv_file('links.csv', links)
+while File.exist?(filepath)
+  nr += 1
+  goodbye("Failed for filepath='#{filepath}', nr=#{nr}") if nr > 9999
+  extname = File.extname(filepath)
+  basename = File.basename(filepath, extname)
+  dirname = File.dirname(filepath)
+  basename = basename.sub(/\.\d{4}$/, '')
+  filename = "#{basename}.#{nr.to_s.rjust(4, '0')}#{extname}"
+  filepath = "#{dirname}/#{filename}"
+end
+
+begin
+  content = RestClient::Request.execute(method: :get, url: url, headers: ASSEMBLA_HEADERS)
+  IO.binwrite(filepath, content)
+  # @jira_attachments << {
+  attachment = {
+      created_at: created_at,
+      created_by: created_by,
+      assembla_attachment_id: id,
+      assembla_ticket_id: assembla_ticket_id,
+      filename: filename,
+      content_type: content_type
+  }
+  write_csv_file_append(attachments_jira_csv, [attachment], counter == 1)
+rescue RestClient::ExceptionWithResponse => e
+  rest_client_exception(e, 'GET', url)
+end
+end
+
+
 exit
 
 results = []
