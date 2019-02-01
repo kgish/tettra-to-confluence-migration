@@ -1,8 +1,0 @@
-{
-  "env": {
-    "EMAIL": "john.doe@example.org",
-    "PASSWORD": "secret",
-    "TETTRA": "https://app.tettra.co",
-    "SPACE": "compnay"
-  }
-}
