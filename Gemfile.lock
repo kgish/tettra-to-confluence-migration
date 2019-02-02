@@ -46,6 +46,7 @@ PLATFORMS
 DEPENDENCIES
   dotenv
   markdown2confluence
+  nokogiri
   rest-client
   rubocop
 

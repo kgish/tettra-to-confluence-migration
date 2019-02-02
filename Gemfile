@@ -16,3 +16,4 @@ gem 'rest-client'
 gem 'rubocop', require: false
 
 gem 'markdown2confluence'
+gem 'nokogiri'

@@ -23,11 +23,10 @@ DATA = ENV['DATA'] || 'data'
 IMAGES = ENV['IMAGES'] || 'images'
 CONVERTER = ENV['CONVERTER'] || 'markdown2confluence'
 EXT = ENV['EXT'] || 'confluence'
-API = ENV['API'] || throw('API must be defined')
-SPACE = ENV['SPACE'] || throw('SPACE must be defined')
-USER = ENV['USER'] || throw('USER must be defined')
-EMAIL = ENV['EMAIL'] || throw('EMAIL must be defined')
-PASSWORD = ENV['PASSWORD'] || throw('PASSWORD must be defined')
+API = ENV['CONFLUENCE_API'] || throw('CONFLUENCE_API must be defined')
+SPACE = ENV['CONFLUENCE_SPACE'] || throw('CONFLUENCE_SPACE must be defined')
+EMAIL = ENV['CONFLUENCE_EMAIL'] || throw('CONFLUENCE_EMAIL must be defined')
+PASSWORD = ENV['CONFLUENCE_PASSWORD'] || throw('CONFLUENCE_PASSWORD must be defined')
 
 # Display environment
 puts
@@ -38,7 +37,6 @@ puts "CONVERTER : '#{CONVERTER}'"
 puts "EXT       : '#{EXT}'"
 puts "API       : '#{API}'"
 puts "SPACE     : '#{SPACE}'"
-puts "USER      : '#{USER}'"
 puts "PASSWORD  : '*******'"
 puts
 
@@ -241,7 +239,6 @@ begin
   write_csv_file_append(attachments_jira_csv, [attachment], counter == 1)
 rescue RestClient::ExceptionWithResponse => e
   rest_client_exception(e, 'GET', url)
-end
 end
 
 
