@@ -1,10 +1,11 @@
 {
   "name": "cypress-tettra",
   "version": "0.0.1",
-  "description": "",
+  "description": "Automated Tettra web crawler",
   "main": "index.js",
   "scripts": {
-    "test": "cypress open"
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run"
   },
   "author": "Kiffin Gish <kiffin.gish@planet.nl> (http://github.com/kgish)",
   "license": "MIT",
