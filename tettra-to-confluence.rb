@@ -280,14 +280,59 @@ else
   exit
 end
 
+# links = []
+# files = Dir["#{DATA}/*.html"]
+# files.each do |file|
+#   counter = 0
+#   content = File.read(file)
+#   m = /^<html><head><title>(.*?)<\/title><\/head><body>(.*)<\/body><\/html>$/.match(content)
+#   title = m[1]
+#   filename = file.sub(/^#{DATA}\//, '')
+#
+#   # <img src="https://tettra-production.s3.us-west-2.amazonaws.com/teams/37251/users/88716/y5TaEh2lPo7ui3vIR0r3znFYQ2JqgYXqvLd9ZDIO.png" alt="..." />
+#   content.scan(/<img src="(.*?)"/).each do |match|
+#     value = match[0]
+#     if value =~ /^https?:\/\/tettra-production\.s3/
+#       counter = counter + 1
+#       links << {
+#           counter: counter,
+#           filename: filename,
+#           title: title,
+#           tag: 'image',
+#           value: value,
+#           page: ''
+#       }
+#     end
+#   end
+#
+#   # <a href="https://app.tettra.co/teams/measurabl/pages/baseline-account-set-up-for-manual">
+#   content.scan(/<a href="(.*?)"/).each do |match|
+#     value = match[0]
+#     if value =~ /^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\//
+#       page = value.match(/^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\/(.*)$/)[1]
+#       counter = counter + 1
+#       links << {
+#           counter: counter,
+#           filename: filename,
+#           title: title,
+#           tag: 'anchor',
+#           value: value,
+#           page: page
+#       }
+#     end
+#   end
+# end
+#
+# write_csv_file('links.csv', links)
+#
 # Download all of the images
-
-links.each do |link|
-  next unless link['tag'] == 'images'
-  url = link['value']
-  image = url.
-    filepath = "#{IMAGES}/#{image}"
-end
+#
+# links.each do |link|
+#   next unless link['tag'] == 'images'
+#   url = link['value']
+#   image = url.
+#     filepath = "#{IMAGES}/#{image}"
+# end
 
 while File.exist?(filepath)
   nr += 1
