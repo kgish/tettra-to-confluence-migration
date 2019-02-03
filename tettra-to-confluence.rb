@@ -86,7 +86,7 @@ list.each do |item|
       parent = categories[offsets[0].to_i]
       if type == 'folder'
         parent[:folders] << {
-          offset: offset[1],
+          offset: offset,
           type: type,
           name: name,
           id: id,
@@ -96,7 +96,7 @@ list.each do |item|
         }
       elsif type == 'page'
         parent[:pages] << {
-          offset: offset[1],
+          offset: offset,
           type: type,
           name: name,
           id: id,
@@ -113,10 +113,10 @@ list.each do |item|
   elsif count == 3
     category = categories.find {|c| c[:offset] === offsets[0]}
     if category
-      parent = categories[offsets[0].to_i];
+      parent = category[:folders][offsets[1].to_i]
       if type == 'folder'
         parent[:folders] << {
-          offset: offset[1],
+          offset: offset,
           type: type,
           name: name,
           id: id,
@@ -126,7 +126,7 @@ list.each do |item|
         }
       elsif type == 'page'
         parent[:pages] << {
-          offset: offset[1],
+          offset: offset,
           type: type,
           name: name,
           id: id,
