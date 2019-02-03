@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-ruby '2.4.1'
+ruby '2.6.0'
 
 git_source(:github) do |repo_name|
   repo_name = "#{repo_name}/#{repo_name}" unless repo_name.include?('/')
@@ -11,9 +11,5 @@ end
 
 gem 'dotenv'
 gem 'rest-client'
-# gem 'i18n'
-
 gem 'rubocop', require: false
-
 gem 'markdown2confluence'
-gem 'nokogiri'

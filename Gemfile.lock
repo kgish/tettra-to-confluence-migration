@@ -46,12 +46,11 @@ PLATFORMS
 DEPENDENCIES
   dotenv
   markdown2confluence
-  nokogiri
   rest-client
   rubocop
 
 RUBY VERSION
-   ruby 2.4.1p111
+   ruby 2.6.0p0
 
 BUNDLED WITH
    1.17.2
