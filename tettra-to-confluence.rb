@@ -49,9 +49,6 @@ HEADERS = {
 }.freeze
 
 
-# Build categories tree
-categories = []
-
 def show_all(items)
   items.each do |c|
     if (c[:type] == 'page')
@@ -71,6 +68,9 @@ def show_all(items)
 end
 
 def build_categories_tree
+# Build categories tree
+  categories = []
+
   list = []
 
 # header = offset|type|name|id|url
@@ -407,6 +407,7 @@ end
 #   exit
 # end
 
-get_all_links
+# get_all_links
+build_categories_tree
 
 puts "\nDone!"
