@@ -145,17 +145,27 @@ list.each do |item|
   end
 end
 
-exit
-
-list.each do |item|
-  offset = item[:offset]
-  offsets = offset.split('-')
-  count = offsets.length
-  puts "--- #{offset} => #{count}"
-  offset.split('-').each_with_index do |offset, index|
-    puts "* #{index} #{offset}"
+def show_all(items)
+  items.each do |c|
+    if (c[:type] == 'page')
+      puts "#{c[:offset]} #{c[:type]} #{c[:name]} #{c[:id]} #{c[:url]}"
+    else
+      folders = c[:folders].length
+      pages = c[:pages].length
+      puts "#{c[:offset]} #{c[:type]} #{c[:name]} #{c[:id]} #{c[:url]} folders: #{folders}, pages: #{pages}"
+      if folders
+        show_all(c[:folders])
+      end
+      if pages
+        show_all(c[:pages])
+      end
+    end
   end
 end
+
+show_all(categories)
+
+exit
 
 def confluence_get_spaces
   url = "#{API}/space"
