@@ -12,4 +12,3 @@ end
 gem 'dotenv'
 gem 'rest-client'
 gem 'rubocop', require: false
-gem 'markdown2confluence'
