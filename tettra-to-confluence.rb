@@ -8,6 +8,9 @@ require 'rest-client'
 require 'base64'
 require 'date'
 
+@categories_tree = nil
+@offset_to_item = {}
+
 # Check that the correct ruby version is being used.
 version = File.read('.ruby-version').strip
 puts "Ruby version: #{RUBY_VERSION}"
@@ -50,18 +53,18 @@ HEADERS = {
   'Accept': 'application/json'
 }.freeze
 
-def show_categories(items)
-  items.each do |c|
+def show_categories(categories_tree)
+  categories_tree.each do |c|
     if c[:type] == 'page'
-      puts "#{c[:offset]} #{c[:type]} #{c[:name]} #{c[:id]} #{c[:url]}"
+      puts "#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]}"
     else
       folders = c[:folders].length
       pages = c[:pages].length
-      puts "#{c[:offset]} #{c[:type]} #{c[:name]} #{c[:id]} #{c[:url]} folders: #{folders}, pages: #{pages}"
-      if folders
+      puts "#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]} folders: #{folders}, pages: #{pages}"
+      if folders.positive?
         show_categories(c[:folders])
       end
-      if pages
+      if pages.positive?
         show_categories(c[:pages])
       end
     end
@@ -75,7 +78,12 @@ def sanity_check
   pages = Dir["#{DATA}/*.html"].map { |page| page.gsub(%r{^data/|.html$}, '') }.each { |name| found[name] = false }
   # header = offset|type|name|id|url
   CSV.foreach(LOGFILE, headers: true, header_converters: :symbol, col_sep: '|') do |row|
-    next unless row[:type] == 'page'
+    type = row[:type]
+    unless %r{category|folder|page}.match?(type)
+      puts "Unknown type='#{type}': must be 'category', 'folder' or 'page' => EXIT"
+      exit
+    end
+    next unless type == 'page'
     name = row[:id]
     if found[name]
       # Already found, add to duplicates
@@ -363,7 +371,11 @@ def get_all_links
   write_csv_file('links.csv', links)
 end
 
-# Download all of the images
+def download_images
+
+end
+
+def download_all_images
 #
 # links.each do |link|
 #   next unless link['tag'] == 'images'
@@ -399,6 +411,7 @@ end
 # rescue RestClient::ExceptionWithResponse => e
 #   rest_client_exception(e, 'GET', url)
 # end
+end
 
 def get_links
   results = []
@@ -441,6 +454,38 @@ def get_links
   write_csv_file('results.csv', results)
 end
 
+def build_offset_to_item(categories_tree, offset_to_item)
+  categories_tree.each do |c|
+    offset_to_item[c[:offset]] = c
+    build_offset_to_item(c[:folders], offset_to_item) if c[:folders] && c[:folders].length.positive?
+    build_offset_to_item(c[:pages], offset_to_item) if c[:pages] && c[:pages].length.positive?
+  end
+  return offset_to_item
+end
+
+def get_parent(offset)
+  if offset.nil? || !offset.is_a?(String) || offset.length.zero?
+    puts 'get_parent() invalid offset => EXIT'
+    exit
+  end
+  offsets = offset.split('-')
+  offsets.pop
+  offsets.length > 1 ? @offset_to_item[offsets.join('-')] : nil
+end
+
+def create_confluence_page(c)
+  parent = get_parent(c[:offset])
+  puts "#{parent ? parent[:offset] + ' \'' + parent[:name] + '\' :: ' : ''}#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]}"
+end
+
+def create_confluence_pages(categories_tree)
+  categories_tree.each do |c|
+    create_confluence_page(c)
+    create_confluence_pages(c[:folders]) if c[:folders] && c[:folders].length.positive?
+    create_confluence_pages(c[:pages]) if c[:pages] && c[:pages].length.positive?
+  end
+end
+
 space = confluence_get_space(SPACE)
 if space
   puts "Found space='#{SPACE}' => OK"
@@ -449,9 +494,12 @@ else
   exit
 end
 
-categories = build_categories_tree
-show_categories(categories)
+@categories_tree = build_categories_tree
+show_categories(@categories_tree)
+@offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
 sanity_check
-get_all_links
+# get_all_links
+download_all_images
+create_confluence_pages(@categories_tree)
 
 puts "\nDone!"
