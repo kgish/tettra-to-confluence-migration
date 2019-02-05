@@ -9,7 +9,7 @@ require 'base64'
 require 'date'
 
 # Check that the correct ruby version is being used.
-version = File.read(".ruby-version").strip
+version = File.read('.ruby-version').strip
 puts "Ruby version: #{RUBY_VERSION}"
 unless RUBY_VERSION == version
   puts "Ruby version = '#{version}' is required, run the following command first:"
@@ -28,6 +28,7 @@ SPACE = ENV['CONFLUENCE_SPACE'] || throw('CONFLUENCE_SPACE must be defined')
 EMAIL = ENV['CONFLUENCE_EMAIL'] || throw('CONFLUENCE_EMAIL must be defined')
 PASSWORD = ENV['CONFLUENCE_PASSWORD'] || throw('CONFLUENCE_PASSWORD must be defined')
 LOGFILE = ENV['TETTRA_LOGFILE'] || throw('TETTRA_LOGFILE must be defined')
+COMPANY = ENV['TETTRA_COMPANY'] || throw('TETTRA_COMPANY must be defined')
 
 # Display environment
 puts
@@ -40,6 +41,7 @@ puts "API       : '#{API}'"
 puts "SPACE     : '#{SPACE}'"
 puts "PASSWORD  : '*******'"
 puts "LOGFILE   : '#{LOGFILE}'"
+puts "COMPANY   : '#{COMPANY}'"
 puts
 
 HEADERS = {
@@ -48,32 +50,63 @@ HEADERS = {
   'Accept': 'application/json'
 }.freeze
 
-
-def show_all(items)
+def show_categories(items)
   items.each do |c|
-    if (c[:type] == 'page')
+    if c[:type] == 'page'
       puts "#{c[:offset]} #{c[:type]} #{c[:name]} #{c[:id]} #{c[:url]}"
     else
       folders = c[:folders].length
       pages = c[:pages].length
       puts "#{c[:offset]} #{c[:type]} #{c[:name]} #{c[:id]} #{c[:url]} folders: #{folders}, pages: #{pages}"
       if folders
-        show_all(c[:folders])
+        show_categories(c[:folders])
       end
       if pages
-        show_all(c[:pages])
+        show_categories(c[:pages])
       end
     end
   end
 end
 
-def build_categories_tree
-# Build categories tree
-  categories = []
+def sanity_check
+  found = {}
+  duplicates = []
+  not_found = []
+  pages = Dir["#{DATA}/*.html"].map { |page| page.gsub(%r{^data/|.html$}, '') }.each { |name| found[name] = false }
+  # header = offset|type|name|id|url
+  CSV.foreach(LOGFILE, headers: true, header_converters: :symbol, col_sep: '|') do |row|
+    next unless row[:type] == 'page'
+    name = row[:id]
+    if found[name]
+      # Already found, add to duplicates
+      duplicates << name
+    else
+      # Mark as found
+      found[name] = true
+    end
+  end
+  pages.each { |page| not_found << page unless found[page] }
+  unless not_found.empty?
+    puts "\nNot found #{not_found.length}:"
+    not_found.each { |page| puts "* #{page}" }
+  end
+  unless duplicates.empty?
+    puts "\nDuplicates #{duplicates.length}:"
+    duplicates.each { |page| puts "* #{page}" }
+  end
+  if !not_found.empty? || !duplicates.empty?
+    puts "\nSanity check => NOK"
+    # exit
+  else
+    puts "\nSanity check => OK"
+  end
+end
 
+def build_categories_tree
+  categories = []
   list = []
 
-# header = offset|type|name|id|url
+  # header = offset|type|name|id|url
   CSV.foreach(LOGFILE, headers: true, header_converters: :symbol, col_sep: '|') do |row|
     list << {
       offset: row[:offset],
@@ -103,7 +136,7 @@ def build_categories_tree
         pages: []
       }
     elsif count == 2
-      category = categories.find {|c| c[:offset] === offsets[0]}
+      category = categories.detect { |c| c[:offset] == offsets[0] }
       if category
         parent = categories[offsets[0].to_i]
         if type == 'folder'
@@ -133,7 +166,7 @@ def build_categories_tree
         exit
       end
     elsif count == 3
-      category = categories.find {|c| c[:offset] === offsets[0]}
+      category = categories.detect { |c| c[:offset] == offsets[0] }
       if category
         parent = category[:folders][offsets[1].to_i]
         if type == 'folder'
@@ -166,7 +199,7 @@ def build_categories_tree
       puts "Count = #{count} => SKIP"
     end
   end
-  show_all(categories)
+  categories
 end
 
 def confluence_get_spaces
@@ -185,7 +218,7 @@ end
 
 # id, key, name, type, status
 def confluence_get_space(name)
-  return confluence_get_spaces.find {|space| space['name'] == name}
+  confluence_get_spaces.detect { |space| space['name'] == name }
 end
 
 def write_csv_file(filename, results)
@@ -211,6 +244,7 @@ def write_csv_file(filename, results)
 end
 
 def confluence_get_content(id)
+  result = nil
   url = "#{API}/content/#{id}?expand=body.storage"
   begin
     response = RestClient::Request.execute(method: :get, url: url, headers: HEADERS)
@@ -219,9 +253,9 @@ def confluence_get_content(id)
   rescue => error
     if error.response
       response = JSON.parse(error.response)
-      statusCode = response['statusCode']
+      status_code = response['statusCode']
       message = response['message']
-      puts "GET #{url} title='#{title}' => NOK statusCode='#{statusCode}', message='#{message}'"
+      puts "GET #{url} title='#{title}' => NOK status_code='#{status_code}', message='#{message}'"
     else
       puts "GET #{url} => NOK error='#{error}'"
     end
@@ -245,13 +279,13 @@ end
 def confluence_create_page(key, title, content)
   result = nil
   payload = {
-    "type": "page",
+    "type": 'page',
     "title": title,
-    "space": {"key": key},
+    "space": { "key": key },
     "body": {
       "storage": {
         "value": content,
-        "representation": "storage"
+        "representation": 'storage'
       }
     }
   }.to_json
@@ -263,9 +297,9 @@ def confluence_create_page(key, title, content)
   rescue => error
     if error.response
       response = JSON.parse(error.response)
-      statusCode = response['statusCode']
+      status_code = response['statusCode']
       message = response['message']
-      puts "POST #{url} title='#{title}' => NOK statusCode='#{statusCode}', message='#{message}'"
+      puts "POST #{url} title='#{title}' => NOK status_code='#{status_code}', message='#{message}'"
     else
       puts "POST #{url} => NOK error='#{error}'"
     end
@@ -279,44 +313,53 @@ def get_all_links
   files.each do |file|
     counter = 0
     content = File.read(file)
-    m = /^<html><head><title>(.*?)<\/title><\/head><body>(.*)<\/body><\/html>$/.match(content)
+    m = %r{^<html><head><title>(.*?)</title></head><body>(.*)</body></html>$}.match(content)
     title = m[1]
-    filename = file.sub(/^#{DATA}\//, '')
+    filename = file.sub(%r{^#{DATA}/}, '')
 
-    # <img src="https://tettra-production.s3.us-west-2.amazonaws.com/teams/37251/users/88716/y5TaEh2lPo7ui3vIR0r3znFYQ2JqgYXqvLd9ZDIO.png" alt="..." />
+    # <img src="https://tettra-production.s3.us-west-2.amazonaws.com/teams/37251/users/88716/y5TaEh2...9ZDIO.png" alt="..." />
     content.scan(/<img src="(.*?)"/).each do |match|
       value = match[0]
-      if value =~ /^https?:\/\/tettra-production\.s3/
-        counter = counter + 1
-        links << {
-          counter: counter,
-          filename: filename,
-          title: title,
-          tag: 'image',
-          value: value,
-          page: ''
-        }
-      end
+      next unless %r{^https?://tettra-production.s3}.match?(value)
+      counter += 1
+      links << {
+        counter: counter,
+        filename: filename,
+        title: title,
+        tag: 'image',
+        page: '',
+        value: value
+      }
     end
 
-    # <a href="https://app.tettra.co/teams/measurabl/pages/baseline-account-set-up-for-manual">
-    content.scan(/<a href="(.*?)"/).each do |match|
-      value = match[0]
-      if value =~ /^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\//
-        page = value.match(/^https?:\/\/app\.tettra\.co\/teams\/measurabl\/pages\/(.*)$/)[1]
-        counter = counter + 1
-        links << {
-          counter: counter,
-          filename: filename,
-          title: title,
-          tag: 'anchor',
-          value: value,
-          page: page
-        }
-      end
+    # <a href="https://app.tettra.co/teams/[COMPANY]/pages/(page)">
+    content.scan(/<a href="(.*?)"/).each do |v|
+      value = v[0]
+      p = value.match(%r{^https?://app.tettra.co/teams/#{COMPANY}/pages/(.*)$})
+      next unless p
+      page = p[1]
+      counter += 1
+      links << {
+        counter: counter,
+        filename: filename,
+        title: title,
+        tag: 'anchor',
+        page: page,
+        value: value
+      }
     end
   end
 
+  puts "\nLinks #{links.length}"
+  unless links.length.zero?
+    links.each do |l|
+      if l[:counter] == 1
+        puts "* #{l[:filename]} '#{l[:title]}'"
+      end
+      puts "  #{l[:counter].to_s.rjust(2, '0')} #{l[:tag]} #{l[:page]} #{l[:value]}"
+    end
+  end
+  puts
   write_csv_file('links.csv', links)
 end
 
@@ -357,34 +400,33 @@ end
 #   rest_client_exception(e, 'GET', url)
 # end
 
-
 def get_links
   results = []
   files = Dir["#{DATA}/*.html"]
   files.each do |file|
     content = File.read(file)
-    m = /^<html><head><title>(.*?)<\/title><\/head><body>(.*)<\/body><\/html>$/.match(content)
+    m = %r{^<html><head><title>(.*?)</title></head><body>(.*)</body></html>$}.match(content)
     title = m[1]
     body = m[2]
-    filename = file.sub(/^#{DATA}\//, '')
+    filename = file.sub(%r{^#{DATA}/}, '')
     if title && body
       puts "#{file} title='#{title}' => OK"
       result = confluence_create_page(space['key'], title, body)
-      if (result)
-        results << {
-          result: 'OK',
-          filename: filename,
-          title: title,
-          id: result['id']
-        }
-      else
-        results << {
-          result: 'NOK',
-          filename: filename,
-          title: title,
-          id: 0
-        }
-      end
+      results << if result
+                   {
+                     result: 'OK',
+                     filename: filename,
+                     title: title,
+                     id: result['id']
+                   }
+                 else
+                   {
+                     result: 'NOK',
+                     filename: filename,
+                     title: title,
+                     id: 0
+                   }
+                 end
     else
       puts "#{file} title='#{title}' => NOK"
       results << {
@@ -399,15 +441,17 @@ def get_links
   write_csv_file('results.csv', results)
 end
 
-# space = confluence_get_space(SPACE)
-# if space
-#   puts "Found space='#{SPACE}' => OK"
-# else
-#   puts "Cannot find space='#{SPACE}' => exit"
-#   exit
-# end
+space = confluence_get_space(SPACE)
+if space
+  puts "Found space='#{SPACE}' => OK"
+else
+  puts "Cannot find space='#{SPACE}' => exit"
+  exit
+end
 
-# get_all_links
-build_categories_tree
+categories = build_categories_tree
+show_categories(categories)
+sanity_check
+get_all_links
 
 puts "\nDone!"

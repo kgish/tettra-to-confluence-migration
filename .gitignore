@@ -56,3 +56,5 @@ logs
 
 cypress.json
 node_modules
+*.log
+*.csv
