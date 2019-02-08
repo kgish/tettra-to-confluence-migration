@@ -4,6 +4,7 @@ load './lib/common.rb'
 
 @categories_tree = nil
 @offset_to_item = {}
+@miscellaneous = []
 
 def show_categories(categories_tree)
   categories_tree.each do |c|
@@ -26,7 +27,6 @@ end
 def sanity_check
   found = {}
   duplicates = []
-  not_found = []
   pages = Dir["#{DATA}/*.html"].map { |page| page.gsub(%r{^data/|.html$}, '') }.each { |name| found[name] = false }
   # header = offset|type|name|id|url
   CSV.foreach(LOGFILE, headers: true, header_converters: :symbol, col_sep: '|') do |row|
@@ -45,20 +45,16 @@ def sanity_check
       found[name] = true
     end
   end
-  pages.each { |page| not_found << page unless found[page] }
-  unless not_found.empty?
-    puts "\nNot found #{not_found.length}:"
-    not_found.sort.each { |page| puts "* #{page}" }
-  end
+  pages.each { |page| @miscellaneous << page unless found[page] }
   unless duplicates.empty?
     puts "\nDuplicates #{duplicates.length}:"
     duplicates.each { |page| puts "* #{page}" }
+    puts "\nSanity check => NOK (duplicates detected)\n"
+    exit
   end
-  if !not_found.empty? || !duplicates.empty?
-    puts "\nSanity check => NOK\n"
-    # exit
-  else
-    puts "\nSanity check => OK\n"
+  unless @miscellaneous.empty?
+    puts "\nTotal miscellaneous: #{@miscellaneous.length}"
+    @miscellaneous.sort.each { |page| puts "* #{page}" }
   end
 end
 
@@ -302,8 +298,12 @@ def get_all_links
 end
 
 def download_image(url, count, total)
-  filepath = "#{IMAGES}/#{SecureRandom.urlsafe_base64}.gif"
+  filepath = "#{IMAGES}/#{File.basename(url)}"
   puts "#{count.to_s.rjust(total.to_s.length, ' ')}/#{total} #{(count*100/total).floor.to_s.rjust(3, ' ')}% #{url}"
+  if File.exist?(filepath)
+    puts 'File already exists => SKIP'
+    return
+  end
   begin
     content = RestClient::Request.execute(method: :get, url: url)
     IO.binwrite(filepath, content)
@@ -397,7 +397,7 @@ def build_offset_to_item(categories_tree, offset_to_item)
     build_offset_to_item(c[:folders], offset_to_item) if c[:folders] && c[:folders].length.positive?
     build_offset_to_item(c[:pages], offset_to_item) if c[:pages] && c[:pages].length.positive?
   end
-  return offset_to_item
+  offset_to_item
 end
 
 def get_parent(offset)
@@ -406,14 +406,15 @@ def get_parent(offset)
     exit
   end
   offsets = offset.split('-')
+  return nil if offsets.length == 1
   offsets.pop
-  offsets.length > 1 ? @offset_to_item[offsets.join('-')] : nil
+  @offset_to_item[offsets.join('-')]
 end
 
 def create_confluence_page(c)
   parent = get_parent(c[:offset])
-  p = parent ? "#{parent[:offset]} '#{parent[:name]} :: " : ''
-  puts "#{p}#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]}"
+  puts "#{parent[:offset]} '#{parent[:name]}' :: " if parent
+  puts "#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]}"
 end
 
 def create_confluence_pages(categories_tree)
@@ -422,6 +423,17 @@ def create_confluence_pages(categories_tree)
     create_confluence_pages(c[:folders]) if c[:folders] && c[:folders].length.positive?
     create_confluence_pages(c[:pages]) if c[:pages] && c[:pages].length.positive?
   end
+end
+
+def upload_confluence_images
+
+end
+
+def handle_miscellaneous
+  puts "\nhandle_miscellaneous() => #{@miscellaneous.length}"
+  # @miscellaneous.each do |id|
+  #
+  # end
 end
 
 space = confluence_get_space(SPACE)
@@ -437,7 +449,10 @@ show_categories(@categories_tree)
 @offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
 sanity_check
 # get_all_links
-download_images
+#download_images
+puts
 create_confluence_pages(@categories_tree)
+upload_confluence_images
+handle_miscellaneous
 
 puts "\nDone!"
