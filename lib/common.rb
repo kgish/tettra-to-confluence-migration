@@ -52,13 +52,6 @@ HEADERS = {
   'Accept': 'application/json'
 }.freeze
 
-def csv_to_array(pathname)
-  csv = CSV::parse(File.open(pathname) {|f| f.read})
-  fields = csv.shift
-  fields = fields.map {|f| f.downcase.tr(' ', '_')}
-  csv.map {|record| Hash[*fields.zip(record).flatten]}
-end
-
 def write_csv_file(filename, results)
   puts filename
   CSV.open(filename, 'wb') do |csv|
@@ -80,6 +73,14 @@ def write_csv_file(filename, results)
     end
   end
 end
+
+def read_csv_file(pathname)
+  csv = CSV::parse(File.open(pathname) {|f| f.read})
+  fields = csv.shift
+  fields = fields.map {|f| f.downcase.tr(' ', '_')}
+  csv.map {|record| Hash[*fields.zip(record).flatten]}
+end
+
 
 def rest_client_exception(e, method, url, payload = {})
   message = 'Unknown error'

@@ -55,7 +55,8 @@ def sanity_check
   end
   unless @miscellaneous.empty?
     puts "\nTotal miscellaneous: #{@miscellaneous.length}"
-    @miscellaneous.sort.each { |page| puts "* #{page}" }
+    @miscellaneous.sort!
+    @miscellaneous.each { |page| puts "* #{page}" }
   end
 end
 
@@ -310,7 +311,7 @@ end
 def download_image(url, count, total)
   filepath = "#{IMAGES}/#{File.basename(url)}"
   puts "#{count.to_s.rjust(total.to_s.length, ' ')}/#{total} #{(count * 100 / total).floor.to_s.rjust(3, ' ')}% #{url}"
-  if File.exist?(filepath)
+  if File.exists?(filepath)
     puts 'File already exists => SKIP'
     return
   end
@@ -323,7 +324,7 @@ def download_image(url, count, total)
 end
 
 def download_images
-  links = csv_to_array('links.csv')
+  links = read_csv_file('links.csv')
   images = links.filter { |link| link['tag'] == 'image' }
   total = images.length
   puts "\nDownloading #{total} images"
@@ -364,34 +365,48 @@ def get_parent(offset)
 end
 
 def get_parent_id(parent)
+  return nil if parent.nil?
   found = @created_pages.find { |page| page[:result] == 'OK' && page[:offset] == parent[:offset] }
   found ? found[:id] : nil
 end
 
-def create_page_item(title, body, offset, parent)
+def create_page_item(filename, title, body, offset, parent)
   parentId = get_parent_id(parent)
   result = confluence_create_page(@space['key'], title, body, parentId)
   @created_pages <<
     if result
       {
         result: 'OK',
-        filename: filename,
-        title: title,
         id: result['id'],
-        offset: offset
+        offset: offset,
+        title: title,
+        filename: filename
       }
     else
       {
         result: 'NOK',
-        filename: filename,
-        title: title,
         id: 0,
-        offset: offset
+        offset: offset,
+        title: title,
+        filename: filename
       }
     end
+  result
+end
+
+def get_title_and_body(filename)
+  content = File.read(filename)
+  m = %r{^<html><head><title>(.*?)</title></head><body>(.*)</body></html>$}.match(content)
+  title = m[1]
+  body = m[2]
+  unless title && body
+    puts "get_title_and_body() file '#{filename}' has invalid title and/or body => SKIP"
+  end
+  [title, body]
 end
 
 def create_page(c)
+  filename = nil
   title = nil
   body = nil
 
@@ -403,26 +418,19 @@ def create_page(c)
   end
   puts "#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]}"
 
-  if ['category', 'folder'].include?(c[:type])
+  if %w{category folder}.include?(c[:type])
     title = c[:name]
     body = ''
   else
     filename = "#{DATA}/#{c[:id]}.html"
     unless File.exists?(filename)
-      puts "create_page() file '#{filename}' does not exit => EXIT"
+      puts "create_page() file '#{filename}' does not exist => EXIT"
       exit
     end
 
-    content = File.read(filename)
-    m = %r{^<html><head><title>(.*?)</title></head><body>(.*)</body></html>$}.match(content)
-    title = m[1]
-    body = m[2]
-    unless title && body
-      puts "create_page() file '#{filename}' has invalid title and/or body => SKIP"
-      return
-    end
+    title, body = get_title_and_body(filename)
   end
-  create_page_item(title, body, c[:offset], parent)
+  create_page_item(filename, title, body, c[:offset], parent)
 end
 
 def create_pages(categories_tree)
@@ -438,11 +446,20 @@ def upload_images
 
 end
 
-def handle_miscellaneous
-  puts "\nhandle_miscellaneous() => #{@miscellaneous.length}"
-  # @miscellaneous.each do |id|
-  #
-  # end
+def create_pages_miscellaneous
+  offset = @categories_tree.length.to_s
+  puts "\ncreate_pages_miscellaneous() length='#{@miscellaneous.length}'"
+  create_page_item('', 'Miscellaneous', '', offset, nil)
+  parent = { offset: offset }
+  @miscellaneous.each_with_index do |id, index|
+    filename = "#{DATA}/#{id}.html"
+    unless File.exists?(filename)
+      puts "create_pages_miscellaneous() file '#{filename}' does not exist => SKIP"
+      next
+    end
+    title, body = get_title_and_body(filename)
+    create_page_item(filename, title, body, "#{offset}-#{index}", parent)
+  end
 end
 
 @space = confluence_get_space(SPACE)
@@ -460,8 +477,8 @@ sanity_check
 # get_all_links
 #download_images
 puts
-create_pages(@categories_tree)
+# create_pages(@categories_tree)
+create_pages_miscellaneous
 upload_images
-handle_miscellaneous
 
 puts "\nDone!"
