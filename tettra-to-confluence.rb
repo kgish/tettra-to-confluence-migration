@@ -32,7 +32,7 @@ def sanity_check
   # header = offset|type|name|id|url
   CSV.foreach(LOGFILE, headers: true, header_converters: :symbol, col_sep: '|') do |row|
     type = row[:type]
-    unless %r{category|folder|page}.match?(type)
+    unless /category|folder|page/.match?(type)
       puts "Unknown type='#{type}': must be 'category', 'folder' or 'page' => EXIT"
       exit
     end
@@ -206,7 +206,7 @@ end
 #   "space": { "key": <KEY> },
 #   "ancestors": [
 #     {
-#       "id": @parentId
+#       "id": @parent_id
 #     }
 #   ],
 #   "body": {
@@ -217,7 +217,7 @@ end
 #   }
 # }
 #
-def confluence_create_page(key, title, content, parentId)
+def confluence_create_page(key, title, content, parent_id)
   result = nil
   payload = {
     "type": 'page',
@@ -230,8 +230,8 @@ def confluence_create_page(key, title, content, parentId)
       }
     }
   }
-  if parentId
-    payload["ancestors"] = [{ "id": parentId }]
+  if parent_id
+    payload['ancestors'] = [{ "id": parent_id }]
   end
   payload = payload.to_json
   url = "#{API}/content"
@@ -311,7 +311,7 @@ end
 def download_image(url, count, total)
   filepath = "#{IMAGES}/#{File.basename(url)}"
   puts "#{count.to_s.rjust(total.to_s.length, ' ')}/#{total} #{(count * 100 / total).floor.to_s.rjust(3, ' ')}% #{url}"
-  if File.exists?(filepath)
+  if File.exist?(filepath)
     puts 'File already exists => SKIP'
     return
   end
@@ -330,17 +330,6 @@ def download_images
   puts "\nDownloading #{total} images"
   images.each_with_index do |image, index|
     download_image(image['value'], index + 1, total)
-  end
-end
-
-def get_title_and_body(id)
-  files = Dir["#{DATA}/*.html"]
-  files.each do |file|
-    content = File.read(file)
-    m = %r{^<html><head><title>(.*?)</title></head><body>(.*)</body></html>$}.match(content)
-    title = m[1]
-    body = m[2]
-    filename = file.sub(%r{^#{DATA}/}, '')
   end
 end
 
@@ -366,13 +355,13 @@ end
 
 def get_parent_id(parent)
   return nil if parent.nil?
-  found = @created_pages.find { |page| page[:result] == 'OK' && page[:offset] == parent[:offset] }
+  found = @created_pages.detect { |page| page[:result] == 'OK' && page[:offset] == parent[:offset] }
   found ? found[:id] : nil
 end
 
 def create_page_item(filename, title, body, offset, parent)
-  parentId = get_parent_id(parent)
-  result = confluence_create_page(@space['key'], title, body, parentId)
+  parent_id = get_parent_id(parent)
+  result = confluence_create_page(@space['key'], title, body, parent_id)
   @created_pages <<
     if result
       {
@@ -406,31 +395,27 @@ def get_title_and_body(filename)
 end
 
 def create_page(c)
-  filename = nil
-  title = nil
-  body = nil
-
   parent = get_parent(c[:offset])
   if parent
     puts "#{parent[:offset]} '#{parent[:name]}' ::"
   else
     puts 'No parent ::'
   end
+
   puts "#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]}"
 
   if %w{category folder}.include?(c[:type])
-    title = c[:name]
-    body = ''
+    create_page_item(nil, c[:name], '', c[:offset], parent)
   else
     filename = "#{DATA}/#{c[:id]}.html"
-    unless File.exists?(filename)
+    unless File.exist?(filename)
       puts "create_page() file '#{filename}' does not exist => EXIT"
       exit
     end
 
     title, body = get_title_and_body(filename)
+    create_page_item(filename, title, body, c[:offset], parent)
   end
-  create_page_item(filename, title, body, c[:offset], parent)
 end
 
 def create_pages(categories_tree)
@@ -442,10 +427,6 @@ def create_pages(categories_tree)
   write_csv_file('created-pages.csv', @created_pages)
 end
 
-def upload_images
-
-end
-
 def create_pages_miscellaneous
   offset = @categories_tree.length.to_s
   puts "\ncreate_pages_miscellaneous() length='#{@miscellaneous.length}'"
@@ -453,7 +434,7 @@ def create_pages_miscellaneous
   parent = { offset: offset }
   @miscellaneous.each_with_index do |id, index|
     filename = "#{DATA}/#{id}.html"
-    unless File.exists?(filename)
+    unless File.exist?(filename)
       puts "create_pages_miscellaneous() file '#{filename}' does not exist => SKIP"
       next
     end
@@ -475,10 +456,10 @@ show_categories(@categories_tree)
 @offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
 sanity_check
 # get_all_links
-#download_images
+# download_images
 puts
 # create_pages(@categories_tree)
 create_pages_miscellaneous
-upload_images
+# upload_images
 
 puts "\nDone!"
