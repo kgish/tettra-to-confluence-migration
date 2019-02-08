@@ -4,6 +4,7 @@ load './lib/common.rb'
 
 @categories_tree = nil
 @offset_to_item = {}
+@created_pages = []
 @miscellaneous = []
 
 def show_categories(categories_tree)
@@ -199,18 +200,23 @@ end
 
 # POST wiki/rest/api/content
 # {
-#     "type": "page",
-#     "title": <TITLE>,
-#     "space": { "key": <KEY> },
-#     "body": {
-#         "storage": {
-#             "value": <CONTENT>,
-#             "representation": "storage"
-#         }
+#   "type": "page",
+#   "title": <TITLE>,
+#   "space": { "key": <KEY> },
+#   "ancestors": [
+#     {
+#       "id": @parentId
 #     }
+#   ],
+#   "body": {
+#     "storage": {
+#       "value": <CONTENT>,
+#       "representation": "storage"
+#     }
+#   }
 # }
 #
-def confluence_create_page(key, title, content)
+def confluence_create_page(key, title, content, parentId)
   result = nil
   payload = {
     "type": 'page',
@@ -222,7 +228,11 @@ def confluence_create_page(key, title, content)
         "representation": 'storage'
       }
     }
-  }.to_json
+  }
+  if parentId
+    payload["ancestors"] = [{ "id": parentId }]
+  end
+  payload = payload.to_json
   url = "#{API}/content"
   begin
     response = RestClient::Request.execute(method: :post, url: url, payload: payload, headers: HEADERS)
@@ -299,7 +309,7 @@ end
 
 def download_image(url, count, total)
   filepath = "#{IMAGES}/#{File.basename(url)}"
-  puts "#{count.to_s.rjust(total.to_s.length, ' ')}/#{total} #{(count*100/total).floor.to_s.rjust(3, ' ')}% #{url}"
+  puts "#{count.to_s.rjust(total.to_s.length, ' ')}/#{total} #{(count * 100 / total).floor.to_s.rjust(3, ' ')}% #{url}"
   if File.exist?(filepath)
     puts 'File already exists => SKIP'
     return
@@ -322,36 +332,7 @@ def download_images
   end
 end
 
-# while File.exist?(filepath)
-#   nr += 1
-#   goodbye("Failed for filepath='#{filepath}', nr=#{nr}") if nr > 9999
-#   extname = File.extname(filepath)
-#   basename = File.basename(filepath, extname)
-#   dirname = File.dirname(filepath)
-#   basename = basename.sub(/\.\d{4}$/, '')
-#   filename = "#{basename}.#{nr.to_s.rjust(4, '0')}#{extname}"
-#   filepath = "#{dirname}/#{filename}"
-# end
-#
-# begin
-#   content = RestClient::Request.execute(method: :get, url: url, headers: ASSEMBLA_HEADERS)
-#   IO.binwrite(filepath, content)
-#   # @jira_attachments << {
-#   attachment = {
-#     created_at: created_at,
-#     created_by: created_by,
-#     assembla_attachment_id: id,
-#     assembla_ticket_id: assembla_ticket_id,
-#     filename: filename,
-#     content_type: content_type
-#   }
-#   write_csv_file_append(attachments_jira_csv, [attachment], counter == 1)
-# rescue RestClient::ExceptionWithResponse => e
-#   rest_client_exception(e, 'GET', url)
-# end
-
-def get_links
-  results = []
+def get_title_and_body(id)
   files = Dir["#{DATA}/*.html"]
   files.each do |file|
     content = File.read(file)
@@ -359,36 +340,7 @@ def get_links
     title = m[1]
     body = m[2]
     filename = file.sub(%r{^#{DATA}/}, '')
-    if title && body
-      puts "#{file} title='#{title}' => OK"
-      result = confluence_create_page(space['key'], title, body)
-      results << if result
-                   {
-                     result: 'OK',
-                     filename: filename,
-                     title: title,
-                     id: result['id']
-                   }
-                 else
-                   {
-                     result: 'NOK',
-                     filename: filename,
-                     title: title,
-                     id: 0
-                   }
-                 end
-    else
-      puts "#{file} title='#{title}' => NOK"
-      results << {
-        result: 'BAD',
-        filename: filename,
-        title: title,
-        id: 0
-      }
-    end
   end
-
-  write_csv_file('results.csv', results)
 end
 
 def build_offset_to_item(categories_tree, offset_to_item)
@@ -411,21 +363,78 @@ def get_parent(offset)
   @offset_to_item[offsets.join('-')]
 end
 
-def create_confluence_page(c)
+def get_parent_id(parent)
+  found = @created_pages.find { |page| page[:result] == 'OK' && page[:offset] == parent[:offset] }
+  found ? found[:id] : nil
+end
+
+def create_page_item(title, body, offset, parent)
+  parentId = get_parent_id(parent)
+  result = confluence_create_page(@space['key'], title, body, parentId)
+  @created_pages <<
+    if result
+      {
+        result: 'OK',
+        filename: filename,
+        title: title,
+        id: result['id'],
+        offset: offset
+      }
+    else
+      {
+        result: 'NOK',
+        filename: filename,
+        title: title,
+        id: 0,
+        offset: offset
+      }
+    end
+end
+
+def create_page(c)
+  title = nil
+  body = nil
+
   parent = get_parent(c[:offset])
-  puts "#{parent[:offset]} '#{parent[:name]}' :: " if parent
-  puts "#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]}"
-end
-
-def create_confluence_pages(categories_tree)
-  categories_tree.each do |c|
-    create_confluence_page(c)
-    create_confluence_pages(c[:folders]) if c[:folders] && c[:folders].length.positive?
-    create_confluence_pages(c[:pages]) if c[:pages] && c[:pages].length.positive?
+  if parent
+    puts "#{parent[:offset]} '#{parent[:name]}' ::"
+  else
+    puts 'No parent ::'
   end
+  puts "#{c[:offset]} #{c[:type]} '#{c[:name]}' #{c[:id]} #{c[:url]}"
+
+  if ['category', 'folder'].include?(c[:type])
+    title = c[:name]
+    body = ''
+  else
+    filename = "#{DATA}/#{c[:id]}.html"
+    unless File.exists?(filename)
+      puts "create_page() file '#{filename}' does not exit => EXIT"
+      exit
+    end
+
+    content = File.read(filename)
+    m = %r{^<html><head><title>(.*?)</title></head><body>(.*)</body></html>$}.match(content)
+    title = m[1]
+    body = m[2]
+    unless title && body
+      puts "create_page() file '#{filename}' has invalid title and/or body => SKIP"
+      return
+    end
+  end
+  create_page_item(title, body, c[:offset], parent)
 end
 
-def upload_confluence_images
+def create_pages(categories_tree)
+  categories_tree.each do |c|
+    create_page(c)
+    create_pages(c[:folders]) if c[:folders] && c[:folders].length.positive?
+    create_pages(c[:pages]) if c[:pages] && c[:pages].length.positive?
+  end
+  write_csv_file('created-pages.csv', @created_pages)
+end
+
+def upload_images
 
 end
 
@@ -436,8 +445,8 @@ def handle_miscellaneous
   # end
 end
 
-space = confluence_get_space(SPACE)
-if space
+@space = confluence_get_space(SPACE)
+if @space
   puts "Found space='#{SPACE}' => OK"
 else
   puts "Cannot find space='#{SPACE}' => exit"
@@ -451,8 +460,8 @@ sanity_check
 # get_all_links
 #download_images
 puts
-create_confluence_pages(@categories_tree)
-upload_confluence_images
+create_pages(@categories_tree)
+upload_images
 handle_miscellaneous
 
 puts "\nDone!"
