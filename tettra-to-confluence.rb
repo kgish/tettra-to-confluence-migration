@@ -82,8 +82,8 @@ def build_categories_tree
     id = item[:id]
     url = item[:url]
     offsets = offset.split('-')
-    count = offsets.length
-    if count == 1
+    n = offsets.length
+    if n == 1
       categories << {
         offset: offset,
         type: type,
@@ -93,7 +93,7 @@ def build_categories_tree
         folders: [],
         pages: []
       }
-    elsif count == 2
+    elsif n == 2
       category = categories.detect { |c| c[:offset] == offsets[0] }
       if category
         parent = categories[offsets[0].to_i]
@@ -123,7 +123,7 @@ def build_categories_tree
         puts "Unknown category for #{item.inspect}"
         exit
       end
-    elsif count == 3
+    elsif n == 3
       category = categories.detect { |c| c[:offset] == offsets[0] }
       if category
         parent = category[:folders][offsets[1].to_i]
@@ -154,7 +154,7 @@ def build_categories_tree
         exit
       end
     else
-      puts "Count = #{count} => SKIP"
+      puts "Count = #{n} => SKIP"
     end
   end
   categories
@@ -308,9 +308,13 @@ def get_all_links
   write_csv_file('links.csv', links)
 end
 
-def download_image(url, count, total)
+def percentage(counter, total)
+  "#{counter.to_s.rjust(total.to_s.length, ' ')}/#{total} #{(counter * 100 / total).floor.to_s.rjust(3, ' ')}%"
+end
+
+def download_image(url, counter, total)
   filepath = "#{IMAGES}/#{File.basename(url)}"
-  puts "#{count.to_s.rjust(total.to_s.length, ' ')}/#{total} #{(count * 100 / total).floor.to_s.rjust(3, ' ')}% #{url}"
+  puts "#{percentage(counter, total)} #{url}"
   if File.exist?(filepath)
     puts 'File already exists => SKIP'
     return
@@ -323,7 +327,7 @@ def download_image(url, count, total)
   end
 end
 
-def download_images
+def download_all_images
   links = read_csv_file('links.csv')
   images = links.filter { |link| link['tag'] == 'image' }
   total = images.length
@@ -331,6 +335,7 @@ def download_images
   images.each_with_index do |image, index|
     download_image(image['value'], index + 1, total)
   end
+  puts "Done!\n"
 end
 
 def build_offset_to_item(categories_tree, offset_to_item)
@@ -418,29 +423,50 @@ def create_page(c)
   end
 end
 
-def create_pages(categories_tree)
+def create_all_pages(categories_tree)
   categories_tree.each do |c|
     create_page(c)
-    create_pages(c[:folders]) if c[:folders] && c[:folders].length.positive?
-    create_pages(c[:pages]) if c[:pages] && c[:pages].length.positive?
+    create_all_pages(c[:folders]) if c[:folders] && c[:folders].length.positive?
+    create_all_pages(c[:pages]) if c[:pages] && c[:pages].length.positive?
   end
   write_csv_file('created-pages.csv', @created_pages)
+  puts "Done!\n"
 end
 
-def create_pages_miscellaneous
+def create_all_pages_miscellaneous
   offset = @categories_tree.length.to_s
-  puts "\ncreate_pages_miscellaneous() length='#{@miscellaneous.length}'"
+  puts "\ncreate_all_pages_miscellaneous() length='#{@miscellaneous.length}'"
   create_page_item('', 'Miscellaneous', '', offset, nil)
   parent = { offset: offset }
   @miscellaneous.each_with_index do |id, index|
     filename = "#{DATA}/#{id}.html"
     unless File.exist?(filename)
-      puts "create_pages_miscellaneous() file '#{filename}' does not exist => SKIP"
+      puts "create_all_pages_miscellaneous() file '#{filename}' does not exist => SKIP"
       next
     end
     title, body = get_title_and_body(filename)
     create_page_item(filename, title, body, "#{offset}-#{index}", parent)
   end
+  puts "Done!\n"
+end
+
+# image => counter,filename,title,tag,page,value
+def upload_image(image, counter, total)
+  c = image['counter']
+  id = image['filename'].sub(/\.html$/, '')
+  image = File.basename(image['value'])
+  puts "#{percentage(counter, total)} counter='#{c}' id='#{id}' image='#{image}'"
+end
+
+def upload_all_images
+  links = read_csv_file('links.csv')
+  images = links.filter { |link| link['tag'] == 'image' }
+  total = images.length
+  puts "\nUploading #{total} images"
+  images.each_with_index do |image, index|
+    upload_image(image, index + 1, total)
+  end
+  puts "Done!\n"
 end
 
 @space = confluence_get_space(SPACE)
@@ -456,10 +482,9 @@ show_categories(@categories_tree)
 @offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
 sanity_check
 # get_all_links
-# download_images
-puts
-# create_pages(@categories_tree)
-create_pages_miscellaneous
-# upload_images
+# download_all_images
+# create_all_pages(@categories_tree)
+# create_all_pages_miscellaneous
+upload_all_images
 
 puts "\nDone!"
