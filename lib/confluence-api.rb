@@ -23,6 +23,15 @@ def confluence_get_space(name)
   confluence_get_spaces.detect { |space| space['name'] == name }
 end
 
+@space = confluence_get_space(SPACE)
+if @space
+  puts "Found space='#{SPACE}' => OK"
+else
+  puts "Cannot find space='#{SPACE}' => exit"
+  exit
+end
+
+
 # GET wiki/rest/api/content/{id}?expand=body.storage"
 def confluence_get_content(id)
   result = nil

@@ -412,12 +412,37 @@ def upload_all_images
   puts "Done!\n"
 end
 
-@space = confluence_get_space(SPACE)
-if @space
-  puts "Found space='#{SPACE}' => OK"
-else
-  puts "Cannot find space='#{SPACE}' => exit"
-  exit
+# Convert all <img src="path/to/{image}" ... /> to
+# <ac:image ac:height="250"><ri:attachment ri:filename="{image}" ri:version-at-save="1" /></ac:image>
+def convert_all_image_links
+  pages = []
+  read_csv_file('links.csv').each do |link|
+    tag = link['tag']
+    filename = link['filename']
+    image = link['value']
+    next unless tag == 'image'
+    page = pages.find { |page| page[:filename] == filename}
+    if page
+      page[:images] << image
+    else
+      pages << {
+        filename: filename,
+        images: [image]
+      }
+    end
+  end
+  puts "\nPages with links: #{pages.length}"
+  total_images = 0
+  pages.each do |page|
+    filename = page[:filename]
+    images = page[:images].length
+    puts "* #{filename} => #{images}"
+    page[:images].each do |image|
+      puts "  * #{image}"
+    end
+    total_images += images
+  end
+  puts "Total images: #{total_images}"
 end
 
 @categories_tree = build_categories_tree
@@ -428,4 +453,5 @@ sanity_check
 # download_all_images
 # create_all_pages(@categories_tree)
 # create_all_pages_miscellaneous
-upload_all_images
+# upload_all_images
+convert_all_image_links
