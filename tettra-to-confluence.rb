@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 load './lib/common.rb'
+load './lib/confluence-api.rb'
 
 @categories_tree = nil
 @offset_to_item = {}
@@ -160,98 +161,6 @@ def build_categories_tree
   categories
 end
 
-def confluence_get_spaces
-  url = "#{API}/space"
-  results = nil
-  begin
-    response = RestClient::Request.execute(method: :get, url: url, headers: HEADERS)
-    body = JSON.parse(response.body)
-    results = body['results']
-    puts "GET #{url} => OK"
-  rescue => e
-    puts "GET #{url} => NOK (#{e.message})"
-  end
-  results
-end
-
-# id, key, name, type, status
-def confluence_get_space(name)
-  confluence_get_spaces.detect { |space| space['name'] == name }
-end
-
-def confluence_get_content(id)
-  result = nil
-  url = "#{API}/content/#{id}?expand=body.storage"
-  begin
-    response = RestClient::Request.execute(method: :get, url: url, headers: HEADERS)
-    result = JSON.parse(response.body)
-    puts "GET #{url} => OK"
-  rescue => error
-    if error.response
-      response = JSON.parse(error.response)
-      status_code = response['statusCode']
-      message = response['message']
-      puts "GET #{url} title='#{title}' => NOK status_code='#{status_code}', message='#{message}'"
-    else
-      puts "GET #{url} => NOK error='#{error}'"
-    end
-  end
-  result
-end
-
-# POST wiki/rest/api/content
-# {
-#   "type": "page",
-#   "title": <TITLE>,
-#   "space": { "key": <KEY> },
-#   "ancestors": [
-#     {
-#       "id": @parent_id
-#     }
-#   ],
-#   "body": {
-#     "storage": {
-#       "value": <CONTENT>,
-#       "representation": "storage"
-#     }
-#   }
-# }
-#
-def confluence_create_page(key, title, content, parent_id)
-  result = nil
-  payload = {
-    "type": 'page',
-    "title": title,
-    "space": { "key": key },
-    "body": {
-      "storage": {
-        "value": content,
-        "representation": 'storage'
-      }
-    }
-  }
-  if parent_id
-    payload['ancestors'] = [{ "id": parent_id }]
-  end
-  payload = payload.to_json
-  url = "#{API}/content"
-  begin
-    response = RestClient::Request.execute(method: :post, url: url, payload: payload, headers: HEADERS)
-    result = JSON.parse(response.body)
-    puts "POST #{url} title='#{title}' => OK"
-  rescue => error
-    if error.response
-      response = JSON.parse(error.response)
-      status_code = response['statusCode']
-      message = response['message']
-      puts "POST #{url} title='#{title}' => NOK status_code='#{status_code}', message='#{message}'"
-    else
-      puts "POST #{url} => NOK error='#{error}'"
-    end
-  end
-  result
-end
-
 def get_all_links
   links = []
   files = Dir["#{DATA}/*.html"]
@@ -308,22 +217,16 @@ def get_all_links
   write_csv_file('links.csv', links)
 end
 
-def percentage(counter, total)
-  "#{counter.to_s.rjust(total.to_s.length, ' ')}/#{total} #{(counter * 100 / total).floor.to_s.rjust(3, ' ')}%"
-end
-
 def download_image(url, counter, total)
   filepath = "#{IMAGES}/#{File.basename(url)}"
-  puts "#{percentage(counter, total)} #{url}"
-  if File.exist?(filepath)
-    puts 'File already exists => SKIP'
-    return
-  end
+  pct = percentage(counter, total)
+  return if File.exist?(filepath)
   begin
     content = RestClient::Request.execute(method: :get, url: url)
     IO.binwrite(filepath, content)
-  rescue RestClient::ExceptionWithResponse => e
-    rest_client_exception(e, 'GET', url)
+    puts "#{pct} GET url=#{url} => OK"
+  rescue => error
+    puts "#{pct} GET url=#{url} => NOK error='#{error.inspect}'"
   end
 end
 
@@ -451,21 +354,61 @@ def create_all_pages_miscellaneous
 end
 
 # image => counter,filename,title,tag,page,value
-def upload_image(image, counter, total)
+def upload_image(page_id, image, counter, total)
   c = image['counter']
   id = image['filename'].sub(/\.html$/, '')
-  image = File.basename(image['value'])
-  puts "#{percentage(counter, total)} counter='#{c}' id='#{id}' image='#{image}'"
+  image_basename = File.basename(image['value'])
+  confluence_create_attachment(page_id, "#{IMAGES}/#{image_basename}", counter, total)
 end
 
 def upload_all_images
+  uploaded_images = []
   links = read_csv_file('links.csv')
+  fb_to_page_id = {}
+  read_csv_file('created-pages.csv').each do |page|
+    next unless page['filename'] && page['filename'].length.positive?
+    fb_to_page_id[page['filename'].gsub(%r{^#{DATA}\/|\.html}, '')] = page['id']
+  end
   images = links.filter { |link| link['tag'] == 'image' }
   total = images.length
   puts "\nUploading #{total} images"
   images.each_with_index do |image, index|
-    upload_image(image, index + 1, total)
+    image_basename = File.basename(image['value'])
+    filename = image['filename']
+    fb = filename.sub(/\.html/, '')
+    page_id = fb_to_page_id[fb]
+    if page_id
+      result = upload_image(page_id, image, index + 1, total)
+      uploaded_images <<
+        if result
+          {
+            result: 'OK',
+            reason: '',
+            page_id: page_id,
+            image_id: result['results'][0]['id'],
+            image_basename: image_basename
+          }
+        else
+          {
+            result: 'NOK',
+            reason: 'FAIL',
+            page_id: page_id,
+            image_id: '',
+            image_basename: image_basename
+          }
+        end
+    else
+      puts "upload_all_images() cannot find page_id for image='#{filename}' => SKIP"
+      uploaded_images << {
+        result: 'NOK',
+        reason: 'SKIP',
+        page_id: '',
+        image_id: '',
+        image_basename: image_basename
+      }
+    end
   end
+  write_csv_file('uploaded-images.csv', uploaded_images)
   puts "Done!\n"
 end
 
@@ -486,5 +429,3 @@ sanity_check
 # create_all_pages(@categories_tree)
 # create_all_pages_miscellaneous
 upload_all_images
-
-puts "\nDone!"

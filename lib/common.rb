@@ -43,8 +43,8 @@ puts "LOGFILE   : '#{LOGFILE}'"
 puts "COMPANY   : '#{COMPANY}'"
 puts
 
-Dir.mkdir(DATA) unless File.exists?(DATA)
-Dir.mkdir(IMAGES) unless File.exists?(IMAGES)
+Dir.mkdir(DATA) unless File.exist?(DATA)
+Dir.mkdir(IMAGES) unless File.exist?(IMAGES)
 
 HEADERS = {
   'Authorization': "Basic #{Base64.encode64("#{EMAIL}:#{PASSWORD}")}",
@@ -75,34 +75,8 @@ def write_csv_file(filename, results)
 end
 
 def read_csv_file(pathname)
-  csv = CSV::parse(File.open(pathname) {|f| f.read})
+  csv = CSV::parse(File.open(pathname) { |f| f.read })
   fields = csv.shift
-  fields = fields.map {|f| f.downcase.tr(' ', '_')}
-  csv.map {|record| Hash[*fields.zip(record).flatten]}
-end
-
-
-def rest_client_exception(e, method, url, payload = {})
-  message = 'Unknown error'
-  begin
-    err = JSON.parse(e.response)
-    if err['errors'] && !err['errors'].empty?
-      message = err['errors'].map {|k, v| "#{k}: #{v}"}.join(' | ')
-    elsif err['errorMessages'] && !err['errorMessages'].empty?
-      message = err['errorMessages'].join(' | ')
-    elsif err['error']
-      message = err['error']
-      if err['error_description']
-        message += ": #{err['error_description']}"
-      end
-    elsif err['status-code']
-      message = "Status code: #{err['status-code']}"
-    else
-      message = e.to_s
-    end
-  rescue
-    message = e.to_s
-  end
-  puts "#{method} #{url}#{payload.empty? ? '' : ' ' + payload.inspect} => NOK (#{message})"
-  message
+  fields = fields.map { |f| f.downcase.tr(' ', '_') }
+  csv.map { |record| Hash[*fields.zip(record).flatten] }
 end
