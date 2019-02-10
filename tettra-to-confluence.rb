@@ -186,7 +186,7 @@ def get_all_links
       }
     end
 
-    # <a href="https://app.tettra.co/teams/[COMPANY]/pages/(page)">
+    # <a href="https://app.tettra.co/teams/[COMPANY]/pages/(page)">(text)</a>
     content.scan(/<a href="(.*?)"/).each do |v|
       value = v[0]
       p = value.match(%r{^https?://app.tettra.co/teams/#{COMPANY}/pages/(.*)$})
@@ -419,15 +419,15 @@ def convert_all_image_links
   read_csv_file('links.csv').each do |link|
     tag = link['tag']
     filename = link['filename']
-    image = link['value']
+    image_link = link['value']
     next unless tag == 'image'
     page = pages.find { |page| page[:filename] == filename }
     if page
-      page[:images] << image
+      page[:image_links] << image_link
     else
       pages << {
         filename: filename,
-        images: [image]
+        image_links: [image_link]
       }
     end
   end
@@ -436,10 +436,10 @@ def convert_all_image_links
   pages.each do |page|
     filename = "#{DATA}/#{page[:filename]}"
     filename_fixed = "#{filename}.fixed"
-    images = page[:images].length
+    images = page[:image_links].length
     puts "* #{filename} => #{images}"
     content_fixed = File.read(filename).dup
-    page[:images].each do |image|
+    page[:image_links].each do |image|
       m = %r{<img src="#{image}".*?/>}.match(content_fixed)
       if m
         link_before = m[0]
@@ -462,6 +462,61 @@ def convert_all_image_links
   puts "Total images: #{total_images}"
 end
 
+# Convert all <a href="https://app.tettra.co/teams/[COMPANY]/pages/(page)">(text)</a> to
+# ???
+def convert_all_page_links
+  pages = []
+  read_csv_file('links.csv').each do |link|
+    tag = link['tag']
+    filename = link['filename']
+    page_link = link['value']
+    next unless tag == 'anchor'
+    page = pages.find { |page| page[:filename] == filename }
+    if page
+      page[:page_links] << page_link
+    else
+      pages << {
+        filename: filename,
+        page_links: [page_link]
+      }
+    end
+  end
+  puts "\nPages with links: #{pages.length}"
+  total_pages = 0
+  pages.each do |page|
+    filename = "#{DATA}/#{page[:filename]}.fixed"
+    unless File.exist?(filename)
+      filename = "#{DATA}/#{page[:filename]}"
+    end
+    filename_fixed = "#{DATA}/#{page[:filename]}.fixed"
+    pages = page[:page_links].length
+    puts "* #{filename} => #{pages}"
+    content_fixed = File.read(filename).dup
+    page[:page_links].each do |page|
+      m = %r{<a href="#{page}".*?>(.*?)</a>}.match(content_fixed)
+      if m
+        link_before = m[0]
+        title = m[1]
+        # link_after = "<ac:image ac:height=\"250\"><ri:attachment ri:filename=\"#{File.basename(page)}\" ri:version-at-save=\"1\" /></ac:image>"
+        puts "  * #{page} => FOUND"
+        puts "  * #{title}"
+        # puts "    #{link_before} => "
+        # puts "    #{link_after}"
+        # content_fixed.sub!(link_before, link_after)
+      else
+        puts "  * #{page} => NOT FOUND"
+      end
+    end
+
+    # File.open(filename_fixed, File::RDWR|File::CREAT, 0644) { |f|
+    #   f.write(content_fixed)
+    # }
+
+    total_pages += pages
+  end
+  puts "Total pages: #{total_pages}"
+end
+
 @categories_tree = build_categories_tree
 show_categories(@categories_tree)
 @offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
@@ -471,5 +526,6 @@ sanity_check
 # create_all_pages(@categories_tree)
 # create_all_pages_miscellaneous
 # upload_all_images
-convert_all_image_links
-# convert_all_anchor_links
+# convert_all_image_links
+convert_all_page_links
+# uudate_all_pages
