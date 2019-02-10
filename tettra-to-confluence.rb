@@ -8,11 +8,6 @@ load './lib/confluence-api.rb'
 @created_pages = []
 @miscellaneous = []
 
-FIXED_EXT = 'fixed'
-LINKS_CSV = 'links.csv'
-UPLOADED_IMAGES_CSV ='uploaded-images.csv'
-CREATED_PAGES_CSV ='created-pages.csv'
-
 def show_categories(categories_tree)
   categories_tree.each do |c|
     if c[:type] == 'page'
@@ -297,14 +292,21 @@ def create_page_item(filename, title, body, offset, parent)
 end
 
 def get_title_and_body(filename)
+  result = nil
   content = File.read(filename)
   m = %r{^<html><head><title>(.*?)</title></head><body>(.*)</body></html>$}.match(content)
-  title = m[1]
-  body = m[2]
-  unless title && body
-    puts "get_title_and_body() file '#{filename}' has invalid title and/or body => SKIP"
+  if m
+    title = m[1]
+    body = m[2]
+    if title && body
+      result = [title, body]
+    else
+      puts "get_title_and_body() filename='#{filename}' has invalid title and/or body"
+    end
+  else
+    puts "get_title_and_body() filename='#{filename}' match failed"
   end
-  [title, body]
+  result
 end
 
 def create_page(c)
@@ -326,8 +328,11 @@ def create_page(c)
       exit
     end
 
-    title, body = get_title_and_body(filename)
-    create_page_item(filename, title, body, c[:offset], parent)
+    title_and_body = get_title_and_body(filename)
+    if title_and_body
+      title, body = title_and_body
+      create_page_item(filename, title, body, c[:offset], parent)
+    end
   end
 end
 
@@ -337,8 +342,6 @@ def create_all_pages(categories_tree)
     create_all_pages(c[:folders]) if c[:folders] && c[:folders].length.positive?
     create_all_pages(c[:pages]) if c[:pages] && c[:pages].length.positive?
   end
-  write_csv_file(CREATED_PAGES_CSV, @created_pages)
-  puts "Done!\n"
 end
 
 def create_all_pages_miscellaneous
@@ -352,8 +355,11 @@ def create_all_pages_miscellaneous
       puts "create_all_pages_miscellaneous() file '#{filename}' does not exist => SKIP"
       next
     end
-    title, body = get_title_and_body(filename)
-    create_page_item(filename, title, body, "#{offset}-#{index}", parent)
+    title_and_body = get_title_and_body(filename)
+    if title_and_body
+      title, body = title_and_body
+      create_page_item(filename, title, body, "#{offset}-#{index}", parent)
+    end
   end
   puts "Done!\n"
 end
@@ -368,7 +374,7 @@ def upload_all_images
   uploaded_images = []
   links = read_csv_file(LINKS_CSV)
   fb_to_page_id = {}
-  read_csv_file(CREATED_PAGES_CVS).each do |page|
+  read_csv_file(CREATED_PAGES_CSV).each do |page|
     next unless page['filename'] && page['filename'].length.positive?
     fb_to_page_id[page['filename'].gsub(%r{^#{DATA}\/|\.html}, '')] = page['id']
   end
@@ -401,7 +407,7 @@ def upload_all_images
           }
         end
     else
-      puts "upload_all_images() cannot find page_id for image='#{filename}' => SKIP"
+      puts "upload_all_images() cannot find page_id for filename='#{filename}' => SKIP"
       uploaded_images << {
         result: 'NOK',
         reason: 'SKIP',
@@ -519,32 +525,74 @@ def convert_all_page_links
 end
 
 def update_all_pages
+  results = []
   created_pages = read_csv_file(CREATED_PAGES_CSV)
-  pages = Dir.glob("#{DATA}/*.fixed")
-  puts "\nTotal pages to be updated: #{pages.length}"
-  pages.each do |filename|
-    fn = filename.gsub!(/\.#{FIXED_EXT}$/, '')
+  pages = Dir["#{DATA}/*.fixed"]
+  total = pages.length
+  puts "\nTotal pages to be updated: #{total}"
+  pages.each_with_index do |filename, index|
+    next if index + 1 < 53
+    fn = filename.gsub(/\.#{FIXED_EXT}$/, '')
     created_page = created_pages.detect { |p| p['result'] == 'OK' && p['filename'] == fn }
     if created_page
       id = created_page['id']
-      title = created_page['title']
-      puts "* #{filename} => FOUND id='#{id}' title='#{title}'"
+      title_and_content = get_title_and_body(filename)
+      if title_and_content
+        title, content = get_title_and_body(filename)
+        puts "* #{filename} => FOUND id='#{id}' title='#{title}'"
+        result = confluence_update_page(@space['key'], id, title, content, index + 1, total)
+        results <<
+          if result
+            {
+              result: 'OK',
+              id: id,
+              title: title,
+              filename: filename
+            }
+          else
+            {
+              result: 'NOK',
+              id: id,
+              title: title,
+              filename: filename
+            }
+          end
+        else
+          puts "* #{filename} => FAILED"
+      end
     else
-      # filename.gsub!(%r{^#{DATA}/|\.html\.#{FIXED_EXT}$}, '')
       puts "* #{filename} => NOT FOUND"
     end
   end
+  write_csv_file(UPDATED_PAGES_CSV, results)
 end
 
 @categories_tree = build_categories_tree
 show_categories(@categories_tree)
 @offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
 sanity_check
-# get_all_links
+get_all_links
 # download_all_images
-# create_all_pages(@categories_tree)
+#create_all_pages(@categories_tree)
+#write_csv_file(CREATED_PAGES_CSV, @created_pages)
 # create_all_pages_miscellaneous
+
 # upload_all_images
+# TODO
+# upload_all_images() cannot find page_id for filename='faq-single-sign-on-sso.html' => SKIP
+# upload_all_images() cannot find page_id for filename='sales-marketing-tools.html' => SKIP
+# upload_all_images() cannot find page_id for filename='planning-for-the-growth-of-the-customer-success-team.html' => SKIP
+
 # convert_all_image_links
 # convert_all_page_links
+
 update_all_pages
+# TODO
+# * data/planning-for-the-growth-of-the-customer-success-team.html.fixed => NOT FOUND
+# * data/faq-single-sign-on-sso.html.fixed => NOT FOUND
+# * data/sales-marketing-tools.html.fixed => NOT FOUND
+# * data/sales-strategy-gtm-planning-document.html.fixed => NOT FOUND
+
+# Test dummy
+# result = confluence_update_page(@space['key'], '57344096', 'Dummy', 'This is new content', 1, 1)
+# puts result

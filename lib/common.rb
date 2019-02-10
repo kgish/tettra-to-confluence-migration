@@ -16,6 +16,13 @@ unless RUBY_VERSION == version
   exit
 end
 
+# Global constants
+FIXED_EXT = 'fixed'
+LINKS_CSV = 'links.csv'
+UPLOADED_IMAGES_CSV ='uploaded-images.csv'
+CREATED_PAGES_CSV ='created-pages.csv'
+UPDATED_PAGES_CSV ='updated-pages.csv'
+
 # Load environment
 DEBUG = ENV['DEBUG'] == 'true'
 DATA = ENV['DATA'] || 'data'

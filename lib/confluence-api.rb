@@ -13,7 +13,7 @@ def confluence_get_spaces
     results = body['results']
     puts "GET url='#{url}' => OK"
   rescue => error
-    puts "GET url='#{url}' => NOK error='#{error.inspect}'"
+    puts "GET url='#{url}' => NOK error='#{error}'"
   end
   results
 end
@@ -32,7 +32,7 @@ else
 end
 
 
-# GET wiki/rest/api/content/{id}?expand=body.storage"
+# GET wiki/rest/api/content/{id}?expand=body.storage
 def confluence_get_content(id)
   result = nil
   url = "#{API}/content/#{id}?expand=body.storage"
@@ -41,7 +41,21 @@ def confluence_get_content(id)
     result = JSON.parse(response.body)
     puts "GET url='#{url}' => OK"
   rescue => error
-    puts "GET url='#{url}' title='#{title}' => NOK error='#{error.inspect}'"
+    puts "GET url='#{url}' => NOK error='#{error}'"
+  end
+  result
+end
+
+# GET wiki/rest/api/content/{id}?expand=version
+def confluence_get_version(id)
+  result = nil
+  url = "#{API}/content/#{id}?expand=version"
+  begin
+    response = RestClient::Request.execute(method: :get, url: url, headers: HEADERS)
+    result = JSON.parse(response.body)
+    puts "GET url='#{url}' => OK"
+  rescue => error
+    puts "GET url='#{url}' => NOK error='#{error}'"
   end
   result
 end
@@ -88,7 +102,7 @@ def confluence_create_page(key, title, content, parent_id)
     result = JSON.parse(response.body)
     puts "POST url='#{url}' title='#{title}' => OK"
   rescue => error
-    puts "POST url='#{url}' title='#{title}' => NOK error='#{error.inspect}'"
+    puts "POST url='#{url}' title='#{title}' => NOK error='#{error}'"
   end
   result
 end
@@ -105,12 +119,19 @@ end
 #   }
 # }
 #
-def confluence_update_page(page_id, content)
+def confluence_update_page(key, id, title, content, counter, total)
+
   result = nil
+  result_get_version = confluence_get_version(id)
+  return nil unless result_get_version
+  version = result_get_version['version']['number']
+
+  pct = percentage(counter, total)
   payload = {
-    "type": 'page',
     "title": title,
+    "type": 'page',
     "space": { "key": key },
+    "version": { "number": version + 1 },
     "body": {
       "storage": {
         "value": content,
@@ -118,18 +139,14 @@ def confluence_update_page(page_id, content)
       }
     }
   }
-  if parent_id
-    payload['ancestors'] = [{ "id": parent_id }]
-  end
   payload = payload.to_json
-  url = "#{API}/content"
-  # { 'X-Atlassian-Token': 'no-check' }
+  url = "#{API}/content/#{id}"
   begin
-    response = RestClient::Request.execute(method: :post, url: url, payload: payload, headers: HEADERS)
+    response = RestClient::Request.execute(method: :put, url: url, payload: payload, headers: HEADERS)
     result = JSON.parse(response.body)
-    puts "POST url='#{url}' title='#{title}' => OK"
+    puts "#{pct} PUT url='#{url}' id='#{id}' => OK"
   rescue => error
-    puts "POST url='#{url}' title='#{title}' => NOK error='#{error.inspect}'"
+    puts "#{pct} PUT url='#{url}' id='#{id}' => NOK error='#{error}'"
   end
   result
 end
@@ -159,7 +176,7 @@ def confluence_create_attachment(page_id, filepath, counter, total)
     result = JSON.parse(response.body)
     puts "#{pct} POST url='#{url}' page_id='#{page_id}' filepath='#{filepath}' => OK"
   rescue => error
-    puts "#{pct} POST url='#{url}' page_id='#{page_id}' filepath='#{filepath}' => NOK error='#{error.inspect}'"
+    puts "#{pct} POST url='#{url}' page_id='#{page_id}' filepath='#{filepath}' => NOK error='#{error}'"
   end
   result
 end
