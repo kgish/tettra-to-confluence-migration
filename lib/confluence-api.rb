@@ -93,6 +93,47 @@ def confluence_create_page(key, title, content, parent_id)
   result
 end
 
+# PUT wiki/rest/api/content/{id}
+# {
+#   "type": "page",
+#   "space": { "key": <KEY> },
+#   "body": {
+#     "storage": {
+#       "value": <CONTENT>,
+#       "representation": "storage"
+#     }
+#   }
+# }
+#
+def confluence_update_page(page_id, content)
+  result = nil
+  payload = {
+    "type": 'page',
+    "title": title,
+    "space": { "key": key },
+    "body": {
+      "storage": {
+        "value": content,
+        "representation": 'storage'
+      }
+    }
+  }
+  if parent_id
+    payload['ancestors'] = [{ "id": parent_id }]
+  end
+  payload = payload.to_json
+  url = "#{API}/content"
+  # { 'X-Atlassian-Token': 'no-check' }
+  begin
+    response = RestClient::Request.execute(method: :post, url: url, payload: payload, headers: HEADERS)
+    result = JSON.parse(response.body)
+    puts "POST url='#{url}' title='#{title}' => OK"
+  rescue => error
+    puts "POST url='#{url}' title='#{title}' => NOK error='#{error.inspect}'"
+  end
+  result
+end
+
 # POST /wiki/rest/api/content/{id}/child/attachment
 # {
 #   multipart: true,
