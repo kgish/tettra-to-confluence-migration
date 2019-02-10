@@ -420,8 +420,7 @@ def upload_all_images
   write_csv_file(UPLOADED_IMAGES_CSV, uploaded_images)
   puts "Done!\n"
 end
-
-# Convert all <img src="path/to/{image}" ... /> to
+# Convert all <img src="path/to/{image}" ... > to
 # <ac:image ac:height="250"><ri:attachment ri:filename="{image}" ri:version-at-save="1" /></ac:image>
 def convert_all_image_links
   pages = []
@@ -449,7 +448,7 @@ def convert_all_image_links
     puts "* #{filename} => #{images}"
     content_fixed = File.read(filename).dup
     page[:image_links].each do |image|
-      m = %r{<img src="#{image}".*?/>}.match(content_fixed)
+      m = /<img src="#{image}".*?>/.match(content_fixed)
       if m
         link_before = m[0]
         fn = File.basename(image)
