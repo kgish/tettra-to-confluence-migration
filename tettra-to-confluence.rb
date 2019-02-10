@@ -421,7 +421,7 @@ def convert_all_image_links
     filename = link['filename']
     image = link['value']
     next unless tag == 'image'
-    page = pages.find { |page| page[:filename] == filename}
+    page = pages.find { |page| page[:filename] == filename }
     if page
       page[:images] << image
     else
@@ -434,12 +434,29 @@ def convert_all_image_links
   puts "\nPages with links: #{pages.length}"
   total_images = 0
   pages.each do |page|
-    filename = page[:filename]
+    filename = "#{DATA}/#{page[:filename]}"
+    filename_fixed = "#{filename}.fixed"
     images = page[:images].length
     puts "* #{filename} => #{images}"
+    content_fixed = File.read(filename).dup
     page[:images].each do |image|
-      puts "  * #{image}"
+      m = %r{<img src="#{image}".*?/>}.match(content_fixed)
+      if m
+        link_before = m[0]
+        link_after = "<ac:image ac:height=\"250\"><ri:attachment ri:filename=\"#{File.basename(image)}\" ri:version-at-save=\"1\" /></ac:image>"
+        puts "  * #{image} => FOUND"
+        puts "    #{link_before} => "
+        puts "    #{link_after}"
+        content_fixed.sub!(link_before, link_after)
+      else
+        puts "  * #{image} => NOT FOUND"
+      end
     end
+
+    File.open(filename_fixed, File::RDWR|File::CREAT, 0644) { |f|
+      f.write(content_fixed)
+    }
+
     total_images += images
   end
   puts "Total images: #{total_images}"
@@ -455,3 +472,4 @@ sanity_check
 # create_all_pages_miscellaneous
 # upload_all_images
 convert_all_image_links
+# convert_all_anchor_links
