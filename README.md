@@ -9,6 +9,7 @@ The toolset has been written with the [Ruby programming language](https://www.ru
 * [Ruby](https://www.ruby-lang.org/en/downloads)
 * [Bundler](http://bundler.io)
 * [Git](https://git-scm.com/downloads)
+* [Cypress](https://www.cypress.io/)
 
 Ensure that you have the correct version of ruby installed and set to using it for scripts.
 
@@ -50,6 +51,44 @@ CONFLUENCE_API=https://company.atlassian.net/wiki/rest/api
 CONFLUENCE_SPACE=Tettra
 CONFLUENCE_EMAIL=user.name@example.org
 CONFLUENCE_PASSWORD=secret
+```
+
+## Cypress
+
+I use Cypress for scraping the Tettra website, so ensure that it is installed correctly.
+
+First install the required dependencies:
+
+```
+$sudo apt-get install xvfb libgtk2.0-0 libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2
+```
+
+Then you can install the package:
+
+```
+$ cd crawler
+$ npm install
+```
+
+In order to configure, copy  `cypress.json.example` to `cypress.json` and make the necessary changes.
+
+```
+$ cat cypress.json
+{
+  "env": {
+    "EMAIL": "john.doe@example.org",
+    "PASSWORD": "secret",
+    "TETTRA": "https://app.tettra.co",
+    "SPACE": "company",
+    "LOGFILE": "crawler.log"
+  }
+}
+```
+
+Running cypress is simple:
+
+```
+$ yarn cypress:run
 ```
 
 ## References
