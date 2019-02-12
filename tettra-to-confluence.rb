@@ -269,6 +269,13 @@ end
 
 def create_page_item(filename, title, body, offset, parent)
   parent_id = get_parent_id(parent)
+  # IMPORTANT: Title MUST be unique => duplicates are renamed to "title - #n"
+  found = @created_pages.select { |page| page[:title].match(/^#{title}(?: - #\d+)?$/) }
+  if found.length.positive?
+    prev_title = title
+    title = "#{title} - ##{found.length}"
+    puts "filename='#{filename}' title='#{prev_title}' is not unique, changed to '#{title}'"
+  end
   result = confluence_create_page(@space['key'], title, body, parent_id)
   @created_pages <<
     if result
@@ -349,6 +356,7 @@ def create_all_pages(categories_tree)
 end
 
 def create_all_pages_miscellaneous
+  @created_pages = read_csv_file(CREATED_PAGES_CSV)
   offset = @categories_tree.length.to_s
   puts "\ncreate_all_pages_miscellaneous() length='#{@miscellaneous.length}'"
   create_page_item('', 'Miscellaneous', '', offset, nil)
@@ -572,27 +580,17 @@ end
 
 @categories_tree = build_categories_tree
 show_categories(@categories_tree)
+exit
+
 @offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
 sanity_check
+
 get_all_links
 
 # download_all_images
 
 # create_all_pages(@categories_tree)
 # write_csv_file(CREATED_PAGES_CSV, @created_pages)
-# TODO
-# 0-11 'Utility Sync' ::
-# 0-11-10 page 'Template for Non-Latin OCR' Ardem Requirements template-for-non-latin-ocrardem-requirements
-# create_page() file 'data/Ardem Requirements.html' does not exist => SKIP
-# 3 'All Things Hubspot' ::
-# 3-2 folder 'Customer Success' 15987 https://app.tettra.co/teams/measurabl/categories/147727/folders/15987
-# POST url='https://gishtech.atlassian.net/wiki/rest/api/content' title='Customer Success' => NOK error='400 Bad Request'
-# 3 'All Things Hubspot' ::
-# 3-3 folder 'Sales' 15986 https://app.tettra.co/teams/measurabl/categories/147727/folders/15986
-# POST url='https://gishtech.atlassian.net/wiki/rest/api/content' title='Sales' => NOK error='400 Bad Request'
-# 3 'All Things Hubspot' ::
-# 3-4 folder 'Marketing' 15985 https://app.tettra.co/teams/measurabl/categories/147727/folders/15985
-# POST url='https://gishtech.atlassian.net/wiki/rest/api/content' title='Marketing' => NOK error='400 Bad Request'
 
 # create_all_pages_miscellaneous
 
@@ -607,8 +605,7 @@ get_all_links
 # convert_all_image_links
 # convert_all_page_links
 
-update_all_pages
-exit
+# update_all_pages
 # TODO
 # * data/faq-single-sign-on-sso.html.fixed => NOT FOUND
 # * data/sales-marketing-tools.html.fixed => NOT FOUND

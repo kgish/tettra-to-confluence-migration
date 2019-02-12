@@ -22,8 +22,8 @@ describe('Tettra website', function () {
               const matches = url.match(/(folder|page)s\/(.*)$/);
               const type = matches[1];
               const id = matches[2];
-              const text = $a.text().replace('|', ' ');
-              log(`${offset}-${index}|${type}|${$a.text()}|${id}|${url}`);
+              const name = $a.text().replace(/\|/g, ' - ');
+              log(`${offset}-${index}|${type}|${name}|${id}|${url}`);
               if (type === 'folder') {
                 crawl_next(`${offset}-${index}`, url);
               }
