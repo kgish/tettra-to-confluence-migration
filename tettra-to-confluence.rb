@@ -589,25 +589,20 @@ show_categories(@categories_tree)
 @offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
 sanity_check
 
-# get_all_links
+get_all_links
 
-# download_all_images
+download_all_images
 
-# create_all_pages(@categories_tree)
-# write_csv_file(CREATED_PAGES_CSV, @created_pages)
+create_all_pages(@categories_tree)
+write_csv_file(CREATED_PAGES_CSV, @created_pages)
 
-# create_all_pages_miscellaneous
-# write_csv_file(CREATED_PAGES_CSV, @created_pages)
+create_all_pages_miscellaneous
+write_csv_file(CREATED_PAGES_CSV, @created_pages)
 
-# upload_all_images
+upload_all_images
 
-# convert_all_image_links
-# convert_all_page_links
+convert_all_image_links
+convert_all_page_links
 
 update_all_pages
-# 17/63  26% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100368465' id='100368465' => NOK error='400 Bad Request'
-# 19/63  30% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100401344' id='100401344' => NOK error='400 Bad Request'
-# 32/63  50% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100303260' id='100303260' => NOK error='400 Bad Request'
-# 35/63  55% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100368430' id='100368430' => NOK error='400 Bad Request'
-# 36/63  57% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100401357' id='100401357' => NOK error='400 Bad Request'
-# 57/63  90% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100303234' id='100303234' => NOK error='400 Bad Request'
+

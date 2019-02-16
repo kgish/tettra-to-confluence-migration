@@ -1,6 +1,11 @@
 # Tettra to Confluence Migration
 
-An advanced tool for migrating from Tettra to Confluence.
+An advanced tool for migrating from Tettra to Confluence easily without haven't to think too much.
+
+Feel free to use this on your own, but if you require support do not hesitate to contact me.
+
+Kiffin Gish
+kiffin.gish@planet.nl
 
 ## Installation
 
