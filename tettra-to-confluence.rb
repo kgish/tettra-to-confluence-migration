@@ -267,14 +267,17 @@ def get_parent_id(parent)
   found ? found[:id] : nil
 end
 
-def create_page_item(filename, title, body, offset, parent)
+def create_page_item(filename, title, body, offset, parent, skip_check = false)
   parent_id = get_parent_id(parent)
   # IMPORTANT: Title MUST be unique => duplicates are renamed to "title - #n"
-  found = @created_pages.select { |page| page[:title].match(/^#{title}(?: - #\d+)?$/) }
-  if found.length.positive?
-    prev_title = title
-    title = "#{title} - ##{found.length}"
-    puts "filename='#{filename}' title='#{prev_title}' is not unique, changed to '#{title}'"
+  # TODO: hack
+  unless skip_check
+    found = @created_pages.select { |page| page[:title].match(/^#{title}(?: - #\d+)?$/) }
+    if found.length.positive?
+      prev_title = title
+      title = "#{title} - ##{found.length}"
+      puts "filename='#{filename}' title='#{prev_title}' is not unique, changed to '#{title}'"
+    end
   end
   result = confluence_create_page(@space['key'], title, body, parent_id)
   @created_pages <<
@@ -342,6 +345,8 @@ def create_page(c)
     title_and_body = get_title_and_body(filename)
     if title_and_body
       title, body = title_and_body
+      # Prepend the body with a link to the original Tettra page
+      body = "<p><a href=\"#{c[:url]}\" target=\"_blank\">Tettra page</a></p>#{body}"
       create_page_item(filename, title, body, c[:offset], parent)
     end
   end
@@ -359,7 +364,7 @@ def create_all_pages_miscellaneous
   @created_pages = read_csv_file(CREATED_PAGES_CSV)
   offset = @categories_tree.length.to_s
   puts "\ncreate_all_pages_miscellaneous() length='#{@miscellaneous.length}'"
-  create_page_item('', 'Miscellaneous', '', offset, nil)
+  create_page_item('', 'Miscellaneous', '', offset, nil, true)
   parent = { offset: offset }
   @miscellaneous.each_with_index do |id, index|
     filename = "#{DATA}/#{id}.html"
@@ -370,7 +375,7 @@ def create_all_pages_miscellaneous
     title_and_body = get_title_and_body(filename)
     if title_and_body
       title, body = title_and_body
-      create_page_item(filename, title, body, "#{offset}-#{index}", parent)
+      create_page_item(filename, title, body, "#{offset}-#{index}", parent, true)
     end
   end
   puts "Done!\n"
@@ -580,12 +585,11 @@ end
 
 @categories_tree = build_categories_tree
 show_categories(@categories_tree)
-exit
 
 @offset_to_item = build_offset_to_item(@categories_tree, @offset_to_item)
 sanity_check
 
-get_all_links
+# get_all_links
 
 # download_all_images
 
@@ -593,49 +597,17 @@ get_all_links
 # write_csv_file(CREATED_PAGES_CSV, @created_pages)
 
 # create_all_pages_miscellaneous
+# write_csv_file(CREATED_PAGES_CSV, @created_pages)
 
 # upload_all_images
-# TODO
-# upload_all_images() cannot find page_id for filename='faq-single-sign-on-sso.html' => SKIP
-# upload_all_images() cannot find page_id for filename='sales-marketing-tools.html' => SKIP
-# upload_all_images() cannot find page_id for filename='template-for-non-latin-ocrardem-requirements.html' => SKIP
-# TODO108/151  71% POST url='https://gishtech.atlassian.net/wiki/rest/api/content/62062696/child/attachment' page_id='62062696' filepath='images/JO077RXkkc7vetmCNNCKvFy2pufTKzNawlI2TfnO.png' => NOK error='400 Bad Request'
-# upload_all_images() cannot find page_id for filename='planning-for-the-growth-of-the-customer-success-team.html' => SKIP
 
 # convert_all_image_links
 # convert_all_page_links
 
-# update_all_pages
-# TODO
-# * data/faq-single-sign-on-sso.html.fixed => NOT FOUND
-# * data/sales-marketing-tools.html.fixed => NOT FOUND
-# * data/sales-strategy-gtm-planning-document.html.fixed => NOT FOUND
-# * data/template-for-non-latin-ocrardem-requirements.html.fixed => NOT FOUND
-
-# * data/deal-stages-for-hubspot-current-sales-pipeline.html.fixed => FOUND id='61931856' title='Deal Stages for Hubspot Current Sales Pipeline'
-# GET url='https://gishtech.atlassian.net/wiki/rest/api/content/61931856?expand=version' => OK
-# 17/63  26% PUT url='https://gishtech.atlassian.net/wiki/rest/api/content/61931856' id='61931856' => NOK error='400 Bad Request'
-
-# * data/baseline-account-set-up-for-users-with-multiple-energy-star-accounts.html.fixed => FOUND id='62095521' title='Baseline Account Set-up for Users with multiple ENERGY STAR accounts'
-# GET url='https://gishtech.atlassian.net/wiki/rest/api/content/62095521?expand=version' => OK
-# 19/63  30% PUT url='https://gishtech.atlassian.net/wiki/rest/api/content/62095521' id='62095521' => NOK error='400 Bad Request'
-
-# * data/baseline-account-set-up-for-limited-e-billing-customers.html.fixed => FOUND id='61898847' title='Baseline Account Set-up for Limited E-billing Customers'
-# GET url='https://gishtech.atlassian.net/wiki/rest/api/content/61898847?expand=version' => OK
-# 32/63  50% PUT url='https://gishtech.atlassian.net/wiki/rest/api/content/61898847' id='61898847' => NOK error='400 Bad Request'
-
-# * data/how-to-create-a-quote-in-hubspot.html.fixed => FOUND id='61833695' title='How to create a Quote in Hubspot'
-# GET url='https://gishtech.atlassian.net/wiki/rest/api/content/61833695?expand=version' => OK
-# 35/63  55% PUT url='https://gishtech.atlassian.net/wiki/rest/api/content/61833695' id='61833695' => NOK error='400 Bad Request'
-
-# * data/initial-customer-training.html.fixed => FOUND id='61997173' title='Initial Customer Training'
-# GET url='https://gishtech.atlassian.net/wiki/rest/api/content/61997173?expand=version' => OK
-# 36/63  57% PUT url='https://gishtech.atlassian.net/wiki/rest/api/content/61997173' id='61997173' => NOK error='400 Bad Request'
-
-# * data/baseline-account-set-up-for-hybrid-properties.html.fixed => FOUND id='62095508' title='Baseline Account Set-up for Hybrid Properties'
-# GET url='https://gishtech.atlassian.net/wiki/rest/api/content/62095508?expand=version' => OK
-# 57/63  90% PUT url='https://gishtech.atlassian.net/wiki/rest/api/content/62095508' id='62095508' => NOK error='400 Bad Request'
-
-# Test dummy
-# result = confluence_update_page(@space['key'], '57344096', 'Dummy', 'This is new content', 1, 1)
-# puts result
+update_all_pages
+# 17/63  26% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100368465' id='100368465' => NOK error='400 Bad Request'
+# 19/63  30% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100401344' id='100401344' => NOK error='400 Bad Request'
+# 32/63  50% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100303260' id='100303260' => NOK error='400 Bad Request'
+# 35/63  55% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100368430' id='100368430' => NOK error='400 Bad Request'
+# 36/63  57% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100401357' id='100401357' => NOK error='400 Bad Request'
+# 57/63  90% PUT url='https://measurabl.atlassian.net/wiki/rest/api/content/100303234' id='100303234' => NOK error='400 Bad Request'
